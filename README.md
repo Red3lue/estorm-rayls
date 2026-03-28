@@ -23,23 +23,24 @@ An AI agent that autonomously manages a tokenized investment fund on a Rayls Pri
 ### How It Works
 
 ```
-Every cycle, the AI agent:
+Every cycle:
 
-  1. OBSERVE  → Reads token balances on Privacy Node, calculates NAV
-  2. THINK    → LLM evaluates risk, yield, liquidity, decides actions
-  3. ATTEST   → Writes decisions to Public Chain (NAV, risk score, reasoning)
-  4. EXECUTE  → DvP swaps + mint/burn on Privacy Node (private)
-  5. ISSUE    → Updates fund share price on Public Chain (public)
+  1. OBSERVE  → Reads ERC-20 balances + ERC-721 inventory, calculates NAV
+  2. THINK    → 4 independent AI agents analyze vault, 3/4 quorum required
+  3. GOVERN   → Apply rules: value threshold, asset permissions, rate limits
+  4. ATTEST   → Writes decisions to Public Chain (labeled AI_QUORUM / HUMAN_APPROVED)
+  5. EXECUTE  → DvP swaps + mint/burn on Privacy Node (private)
+  6. ISSUE    → Updates vault share price + mints receipt tokens (public)
 ```
 
 ### What Lives Where
 
 | Layer | Components | Visibility |
 |-------|-----------|------------|
-| **Privacy Node** | 5 RWA tokens, TreasuryLedger.sol, DvP swaps | Private — only the AI agent sees this |
+| **Privacy Node** | 4 ERC-20 RWAs, 2 ERC-721 art NFTs, VaultLedger.sol, DvP swaps | Private — only the AI agent sees this |
 | **Subnet Hub** | Token Registry, governance, DvP settlement | Managed by Rayls — we register tokens here |
-| **Public Chain** | Attestation.sol, FundShareToken.sol, Marketplace.sol | Public — investors and anyone can verify |
-| **Off-chain** | AI Agent (TypeScript + Claude Code CLI) | Runs alongside Privacy Node in production |
+| **Public Chain** | Attestation.sol, VaultShareToken.sol, ReceiptToken.sol, Marketplace.sol | Public — investors and anyone can verify |
+| **Off-chain** | AI Agent (TypeScript + Claude Code CLI, 4-agent quorum) | Runs alongside Privacy Node in production |
 
 ### The Disclosure Design
 
@@ -47,11 +48,12 @@ Investors see:
 - NAV (Net Asset Value)
 - Risk score (0-100)
 - Portfolio yield
-- AI reasoning for every decision
-- Fund share price
+- AI reasoning with quorum vote counts
+- Vault share price + receipt token certifications
+- Decision origin: AI_QUORUM (3/4) or HUMAN_APPROVED
 
 Investors never see:
-- Which specific assets the fund holds
+- Which specific assets the vault holds
 - Individual asset amounts or counterparties
 - Trading strategy details
 
@@ -71,22 +73,24 @@ Investors never see:
 estorm-rayls/
 ├── contracts/              # Solidity smart contracts
 │   ├── privacy-node/       # Deployed to Privacy Node
-│   │   ├── tokens/         # RWA asset tokens (ERC-20)
-│   │   └── TreasuryLedger.sol
+│   │   ├── tokens/         # ERC-20 RWA tokens + ERC-721 art tokens
+│   │   └── VaultLedger.sol
 │   └── public-chain/       # Deployed to Public Chain
 │       ├── Attestation.sol
-│       ├── FundShareToken.sol
+│       ├── VaultShareToken.sol
+│       ├── ReceiptToken.sol
 │       └── Marketplace.sol
-├── agent/                  # AI Treasury Agent
+├── agent/                  # AI Sovereign Vault Agent
 │   ├── modules/
-│   │   ├── observe.ts      # Portfolio observation
-│   │   ├── think.ts        # LLM strategy engine
-│   │   ├── attest.ts       # On-chain attestation
-│   │   ├── execute.ts      # Trade execution
-│   │   └── issue.ts        # Fund share management
+│   │   ├── observe.ts      # Multi-asset vault snapshot
+│   │   ├── think.ts        # 4-agent quorum engine
+│   │   ├── govern.ts       # Governance rules (threshold, permissions, rate limit)
+│   │   ├── attest.ts       # On-chain attestation (with decision origin labels)
+│   │   ├── execute.ts      # Governed vault operations
+│   │   └── issue.ts        # Vault shares + receipt token management
 │   ├── adapters/
 │   │   ├── llm.ts          # LLM adapter interface
-│   │   └── claude-code.ts   # Claude Code CLI implementation
+│   │   └── claude-code.ts  # Claude Code CLI implementation
 │   ├── clients/
 │   │   ├── privacy-node.ts # Privacy Node RPC client
 │   │   ├── public-chain.ts # Public Chain RPC client
