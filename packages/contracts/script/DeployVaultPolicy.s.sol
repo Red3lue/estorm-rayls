@@ -3,12 +3,15 @@ pragma solidity 0.8.24;
 
 import {Script, console} from "forge-std/Script.sol";
 import {VaultPolicy} from "../src/VaultPolicy.sol";
+import {VaultLedger} from "../src/VaultLedger.sol";
 
 /// @dev Run: forge script script/DeployVaultPolicy.s.sol --rpc-url privacy_node --broadcast --legacy
 contract DeployVaultPolicy is Script {
     function run() external {
         uint256 deployerKey  = vm.envUint("DEPLOYER_PRIVATE_KEY");
         address deployerAddr = vm.addr(deployerKey);
+
+        address vaultLedger  = vm.envAddress("VAULT_LEDGER_ADDRESS");
 
         // Manager and agent are both the deployer wallet for the hackathon.
         // In production: manager = multisig, agent = AI wallet.
@@ -25,16 +28,21 @@ contract DeployVaultPolicy is Script {
         VaultPolicy policy = new VaultPolicy(
             manager,
             agent,
+            vaultLedger,
             valueThreshold,
             maxTxPerWindow,
             windowDuration
         );
+
+        // Transfer VaultLedger ownership to VaultPolicy so forwarded calls pass onlyOwner
+        VaultLedger(vaultLedger).transferOwnership(address(policy));
 
         vm.stopBroadcast();
 
         console.log("VaultPolicy:        ", address(policy));
         console.log("Manager:            ", manager);
         console.log("Agent:              ", agent);
+        console.log("VaultLedger:        ", vaultLedger);
         console.log("Value threshold:    $50,000");
         console.log("Rate limit:         10 tx/hour");
         console.log("Art category:       human-only");

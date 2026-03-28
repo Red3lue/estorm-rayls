@@ -1,32 +1,42 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.24;
 
+/// @dev Minimal VaultLedger interface for value extraction
+interface IVaultLedger {
+    function getNAV() external view returns (uint256);
+    /// @notice Live value of `rawAmount` of `token` based on oracle + decimals.
+    function getTokenValue(address token, uint256 rawAmount) external view returns (uint256);
+    /// @notice Live value of the entire balance of `token` held by the vault.
+    function getAssetValue(address token) external view returns (uint256);
+    function erc721Assets(bytes32 key) external view returns (
+        address tokenAddress, uint256 tokenId, string memory symbol,
+        uint256 valuationUSD, bool certified, uint8 certScore, uint8 riskScore, bool active
+    );
+}
+
 /// @title VaultPolicy
 /// @notice On-chain governance gateway and execution engine for the Sovereign Vault Protocol.
-///         The AI agent submits encoded calls (target + calldata + metadata). VaultPolicy
-///         checks governance rules and either:
-///           (A) Executes the call immediately     → ProposalAutoExecuted
-///           (B) Queues it for human approval       → ProposalPending → ProposalApproved → executed
 ///
-///         VaultPolicy must be the owner of all vault contracts it manages
-///         (VaultLedger, ArtNFT, RWAToken) so that forwarded calls are accepted.
+///         The AI agent submits an encoded vault operation (target + calldata). VaultPolicy
+///         derives the true transaction value from the calldata + VaultLedger on-chain state
+///         — the agent CANNOT misreport the value. Three governance gates are checked:
 ///
-///         Two roles:
-///           - manager : human fund manager (approve / dismiss / configure / emergency)
-///           - agent   : AI agent wallet   (propose / withdraw)
-///
-///         Three auto-execution gates (ALL must pass):
 ///           1. Category permission  — asset category must be AI-managed
-///           2. Value threshold      — valueUSD <= valueThreshold
-///           3. Rate limit           — txs executed this window < maxTxPerWindow
+///           2. Value threshold      — derived value <= valueThreshold
+///           3. Rate limit           — auto-executed txs this window < maxTxPerWindow
 ///
-///         Deployed on Privacy Node.
+///         If all pass  → call is executed immediately  (AUTO_EXECUTED)
+///         If any fails → call is queued for manager    (PENDING → APPROVED → executed)
+///
+///         VaultPolicy must own the vault contracts it manages (VaultLedger, ArtNFT, etc.)
+///         so that forwarded calls pass onlyOwner checks.
 contract VaultPolicy {
 
     // ─── Roles ───────────────────────────────────────────────────────────────
 
     address public manager;
     address public agent;
+    address public vaultLedger; // source of truth for value checks
 
     modifier onlyManager() { require(msg.sender == manager, "not manager"); _; }
     modifier onlyAgent()   { require(msg.sender == agent,   "not agent");   _; }
@@ -39,10 +49,10 @@ contract VaultPolicy {
     // ─── Governance Settings ─────────────────────────────────────────────────
 
     struct GovernanceSettings {
-        uint256 valueThreshold;  // cents — proposals above this require human approval
-        uint256 maxTxPerWindow;  // max auto-executed tx per window
-        uint256 windowDuration;  // window length in seconds
-        bool    paused;          // emergency stop
+        uint256 valueThreshold;  // cents — derived value above this requires human approval
+        uint256 maxTxPerWindow;  // max auto-executed txs per rate-limit window
+        uint256 windowDuration;  // window duration in seconds
+        bool    paused;
     }
 
     GovernanceSettings public settings;
@@ -55,34 +65,52 @@ contract VaultPolicy {
     uint256 private _windowStart;
     uint256 private _txCountInWindow;
 
+    // ─── Function Selectors (for on-chain value extraction) ──────────────────
+
+    // VaultLedger.updatePortfolio(address[],uint8[],uint256[])
+    bytes4 internal constant SEL_UPDATE_PORTFOLIO =
+        bytes4(keccak256("updatePortfolio(address[],uint8[],uint256[])"));
+    // VaultLedger.addERC20Asset(address,string,uint8,uint256)
+    bytes4 internal constant SEL_ADD_ERC20 =
+        bytes4(keccak256("addERC20Asset(address,string,uint8,uint256)"));
+    // VaultLedger.swap(address,uint256,address,uint256,address)
+    bytes4 internal constant SEL_SWAP =
+        bytes4(keccak256("swap(address,uint256,address,uint256,address)"));
+    // VaultLedger.updateERC721(address,uint256,uint256,bool,uint8,uint8)
+    bytes4 internal constant SEL_UPDATE_ERC721 =
+        bytes4(keccak256("updateERC721(address,uint256,uint256,bool,uint8,uint8)"));
+    // ArtNFT.certify(uint256,uint8,string)
+    bytes4 internal constant SEL_CERTIFY =
+        bytes4(keccak256("certify(uint256,uint8,string)"));
+
     // ─── Proposal Lifecycle ──────────────────────────────────────────────────
 
     enum ProposalStatus { PENDING, AUTO_EXECUTED, APPROVED, DISMISSED, WITHDRAWN }
 
     struct Proposal {
         uint256        id;
-        address        target;       // contract to call
-        bytes          callData;     // encoded function call (built by agent)
+        address        target;
+        bytes          callData;
         AssetCategory  category;
-        uint256        valueUSD;     // in cents
-        string         reasoning;    // AI reasoning (stored privately on Privacy Node)
-        uint8          quorumVotes;  // 0-4 agents agreed
+        uint256        valueUSD;     // derived on-chain from callData + VaultLedger
+        string         reasoning;
+        uint8          quorumVotes;
         ProposalStatus status;
         uint256        createdAt;
         uint256        resolvedAt;
-        address        resolvedBy;   // address(0) = auto-exec or agent withdraw
+        address        resolvedBy;
     }
 
-    /// @dev _proposals[0] is a placeholder — IDs start at 1
+    /// @dev index 0 is a placeholder — IDs start at 1
     Proposal[] private _proposals;
 
-    uint256 public pendingProposalId; // 0 = no pending proposal
+    uint256 public pendingProposalId;
     uint256 public totalProposals;
 
     // ─── Events ──────────────────────────────────────────────────────────────
 
-    event ProposalAutoExecuted(uint256 indexed id, AssetCategory category, uint8 quorumVotes, uint256 valueUSD, address target);
-    event ProposalPending(uint256 indexed id, AssetCategory category, uint8 quorumVotes, uint256 valueUSD, string reasoning);
+    event ProposalAutoExecuted(uint256 indexed id, AssetCategory category, uint8 quorumVotes, uint256 derivedValueUSD, address target);
+    event ProposalPending(uint256 indexed id, AssetCategory category, uint8 quorumVotes, uint256 derivedValueUSD, string reasoning);
     event ProposalApproved(uint256 indexed id, address indexed by);
     event ProposalDismissed(uint256 indexed id, address indexed by);
     event ProposalWithdrawn(uint256 indexed id);
@@ -93,21 +121,25 @@ contract VaultPolicy {
     event Resumed(address indexed by);
     event ManagerTransferred(address indexed oldManager, address indexed newManager);
     event AgentUpdated(address indexed oldAgent, address indexed newAgent);
+    event VaultLedgerUpdated(address indexed oldLedger, address indexed newLedger);
 
     // ─── Constructor ─────────────────────────────────────────────────────────
 
     constructor(
         address _manager,
         address _agent,
+        address _vaultLedger,
         uint256 _valueThreshold,
         uint256 _maxTxPerWindow,
         uint256 _windowDuration
     ) {
-        require(_manager != address(0), "zero manager");
-        require(_agent   != address(0), "zero agent");
+        require(_manager     != address(0), "zero manager");
+        require(_agent       != address(0), "zero agent");
+        require(_vaultLedger != address(0), "zero vaultLedger");
 
-        manager = _manager;
-        agent   = _agent;
+        manager     = _manager;
+        agent       = _agent;
+        vaultLedger = _vaultLedger;
 
         settings = GovernanceSettings({
             valueThreshold: _valueThreshold,
@@ -116,16 +148,13 @@ contract VaultPolicy {
             paused:         false
         });
 
-        // Default: bonds, receivables, stablecoins, NAV updates, issuance = AI-managed
-        //          art = human-only
         categoryPermissions[AssetCategory.BOND]       = true;
         categoryPermissions[AssetCategory.RECEIVABLE] = true;
         categoryPermissions[AssetCategory.STABLECOIN] = true;
         categoryPermissions[AssetCategory.NAV_UPDATE] = true;
         categoryPermissions[AssetCategory.ISSUANCE]   = true;
-        categoryPermissions[AssetCategory.ART]        = false;
+        categoryPermissions[AssetCategory.ART]        = false; // human-only by default
 
-        // Placeholder at index 0 so IDs start at 1
         _proposals.push(Proposal({
             id: 0, target: address(0), callData: "", category: AssetCategory.BOND,
             valueUSD: 0, reasoning: "", quorumVotes: 0,
@@ -137,25 +166,28 @@ contract VaultPolicy {
 
     // ─── Propose ─────────────────────────────────────────────────────────────
 
-    /// @notice Agent submits a vault operation. Governance gates decide auto-exec vs queue.
-    /// @param target      Contract to call (e.g. VaultLedger, ArtNFT)
-    /// @param callData    ABI-encoded function call to forward
-    /// @param category    Asset category for permission check
-    /// @param valueUSD    Transaction value in cents for threshold check
-    /// @param reasoning   AI's reasoning (stored on-chain, private)
-    /// @param quorumVotes Number of AI agents that agreed (0-4)
-    /// @return id         Assigned proposal ID
+    /// @notice Agent submits a vault operation. Value is derived from calldata on-chain —
+    ///         the agent cannot misreport it. Governance gates decide auto-exec vs queue.
+    ///
+    /// @param target      Contract to call (VaultLedger, ArtNFT, etc.)
+    /// @param callData    ABI-encoded function call
+    /// @param category    Asset category (for permission gate)
+    /// @param reasoning   AI reasoning string (stored privately on Privacy Node)
+    /// @param quorumVotes Number of agents that agreed (0-4)
+    /// @return id         Proposal ID
     function propose(
         address         target,
         bytes calldata  callData,
         AssetCategory   category,
-        uint256         valueUSD,
         string calldata reasoning,
         uint8           quorumVotes
     ) external onlyAgent notPaused returns (uint256 id) {
         require(target != address(0), "zero target");
 
-        bool autoExec = _canAutoExecute(category, valueUSD);
+        // Derive the true value from calldata — not from agent input
+        uint256 derivedValue = _extractValue(callData, target);
+
+        bool autoExec = _canAutoExecute(category, derivedValue);
 
         id = _proposals.length;
         totalProposals++;
@@ -165,7 +197,7 @@ contract VaultPolicy {
             target:      target,
             callData:    callData,
             category:    category,
-            valueUSD:    valueUSD,
+            valueUSD:    derivedValue,
             reasoning:   reasoning,
             quorumVotes: quorumVotes,
             status:      autoExec ? ProposalStatus.AUTO_EXECUTED : ProposalStatus.PENDING,
@@ -177,17 +209,17 @@ contract VaultPolicy {
         if (autoExec) {
             _txCountInWindow++;
             _execute(id, target, callData);
-            emit ProposalAutoExecuted(id, category, quorumVotes, valueUSD, target);
+            emit ProposalAutoExecuted(id, category, quorumVotes, derivedValue, target);
         } else {
             require(pendingProposalId == 0, "pending proposal exists: resolve it first");
             pendingProposalId = id;
-            emit ProposalPending(id, category, quorumVotes, valueUSD, reasoning);
+            emit ProposalPending(id, category, quorumVotes, derivedValue, reasoning);
         }
     }
 
-    // ─── Manager: Approve ────────────────────────────────────────────────────
+    // ─── Manager ─────────────────────────────────────────────────────────────
 
-    /// @notice Manager approves the pending proposal → executes the stored call.
+    /// @notice Approve pending proposal — executes the stored call.
     function approve(uint256 proposalId) external onlyManager notPaused {
         _assertPending(proposalId);
         Proposal storage p = _proposals[proposalId];
@@ -199,7 +231,7 @@ contract VaultPolicy {
         emit ProposalApproved(proposalId, msg.sender);
     }
 
-    /// @notice Manager dismisses the pending proposal — action is discarded, not executed.
+    /// @notice Dismiss pending proposal — discards without executing.
     function dismiss(uint256 proposalId) external onlyManager {
         _assertPending(proposalId);
         Proposal storage p = _proposals[proposalId];
@@ -210,10 +242,9 @@ contract VaultPolicy {
         emit ProposalDismissed(proposalId, msg.sender);
     }
 
-    // ─── Agent: Withdraw ─────────────────────────────────────────────────────
+    // ─── Agent ───────────────────────────────────────────────────────────────
 
-    /// @notice Agent withdraws its own pending proposal when vault state has changed
-    ///         and the queued action is no longer valid.
+    /// @notice Withdraw a pending proposal that is no longer valid (vault state changed).
     function withdraw(uint256 proposalId) external onlyAgent {
         _assertPending(proposalId);
         Proposal storage p = _proposals[proposalId];
@@ -221,18 +252,6 @@ contract VaultPolicy {
         p.resolvedAt = block.timestamp;
         pendingProposalId = 0;
         emit ProposalWithdrawn(proposalId);
-    }
-
-    // ─── Emergency ───────────────────────────────────────────────────────────
-
-    function emergencyStop() external onlyManager {
-        settings.paused = true;
-        emit EmergencyStop(msg.sender);
-    }
-
-    function resume() external onlyManager {
-        settings.paused = false;
-        emit Resumed(msg.sender);
     }
 
     // ─── Settings ────────────────────────────────────────────────────────────
@@ -254,6 +273,16 @@ contract VaultPolicy {
         emit CategoryPermissionSet(category, aiManaged);
     }
 
+    function emergencyStop() external onlyManager {
+        settings.paused = true;
+        emit EmergencyStop(msg.sender);
+    }
+
+    function resume() external onlyManager {
+        settings.paused = false;
+        emit Resumed(msg.sender);
+    }
+
     function transferManager(address newManager) external onlyManager {
         require(newManager != address(0), "zero address");
         emit ManagerTransferred(manager, newManager);
@@ -266,25 +295,29 @@ contract VaultPolicy {
         agent = newAgent;
     }
 
-    // ─── Read ────────────────────────────────────────────────────────────────
-
-    function getSettings() external view returns (GovernanceSettings memory, bool[6] memory permissions) {
-        permissions[0] = categoryPermissions[AssetCategory.BOND];
-        permissions[1] = categoryPermissions[AssetCategory.RECEIVABLE];
-        permissions[2] = categoryPermissions[AssetCategory.STABLECOIN];
-        permissions[3] = categoryPermissions[AssetCategory.ART];
-        permissions[4] = categoryPermissions[AssetCategory.NAV_UPDATE];
-        permissions[5] = categoryPermissions[AssetCategory.ISSUANCE];
-        return (settings, permissions);
+    function setVaultLedger(address newLedger) external onlyManager {
+        require(newLedger != address(0), "zero address");
+        emit VaultLedgerUpdated(vaultLedger, newLedger);
+        vaultLedger = newLedger;
     }
 
-    /// @notice Returns the current pending proposal. Reverts if none.
+    // ─── Read ────────────────────────────────────────────────────────────────
+
+    function getSettings() external view returns (GovernanceSettings memory, bool[6] memory perms) {
+        perms[0] = categoryPermissions[AssetCategory.BOND];
+        perms[1] = categoryPermissions[AssetCategory.RECEIVABLE];
+        perms[2] = categoryPermissions[AssetCategory.STABLECOIN];
+        perms[3] = categoryPermissions[AssetCategory.ART];
+        perms[4] = categoryPermissions[AssetCategory.NAV_UPDATE];
+        perms[5] = categoryPermissions[AssetCategory.ISSUANCE];
+        return (settings, perms);
+    }
+
     function getPendingProposal() external view returns (Proposal memory) {
         require(pendingProposalId != 0, "no pending proposal");
         return _proposals[pendingProposalId];
     }
 
-    /// @notice Full history — skips placeholder at index 0.
     function getProposalHistory() external view returns (Proposal[] memory history) {
         uint256 count = _proposals.length > 1 ? _proposals.length - 1 : 0;
         history = new Proposal[](count);
@@ -300,11 +333,92 @@ contract VaultPolicy {
         windowEndsAt = _windowStart + settings.windowDuration;
     }
 
-    // ─── Internal ────────────────────────────────────────────────────────────
+    /// @notice Public helper — lets callers preview the derived value for a given calldata.
+    function extractValue(bytes calldata callData, address target) external view returns (uint256) {
+        return _extractValue(callData, target);
+    }
+
+    // ─── Internal: Value Extraction ──────────────────────────────────────────
+
+    /// @notice Derive the true operation value from calldata + VaultLedger/Oracle state.
+    ///         The agent CANNOT override this — computed entirely on-chain.
+    ///
+    ///         Supported selectors:
+    ///           updatePortfolio(address[],uint8[],uint256[])
+    ///               → current VaultLedger NAV (whole portfolio at stake)
+    ///           addERC20Asset(address,string,uint8,uint256)
+    ///               → live oracle value of vault's current balance of that token
+    ///                 (tokens must be in vault before proposal)
+    ///           swap(address,uint256,address,uint256,address)
+    ///               → oracle value of amountIn being sold  (VaultLedger.getTokenValue)
+    ///           updateERC721(address,uint256,uint256,bool,uint8,uint8)
+    ///               → valuationUSD from calldata param 2
+    ///           certify(uint256,uint8,string)
+    ///               → NFT current valuation from VaultLedger (by tokenId + target)
+    ///           everything else → 0
+    function _extractValue(bytes memory callData, address target) internal view returns (uint256) {
+        if (callData.length < 4) return 0;
+
+        bytes4 sel;
+        assembly { sel := mload(add(callData, 32)) }
+
+        // updatePortfolio: whole portfolio refreshed → NAV at stake
+        if (sel == SEL_UPDATE_PORTFOLIO) {
+            return IVaultLedger(vaultLedger).getNAV();
+        }
+
+        // addERC20Asset(address tokenAddress, string, uint8, uint256)
+        // tokenAddress is param 0 at offset 4 — ask VaultLedger for live oracle value
+        if (sel == SEL_ADD_ERC20 && callData.length >= 36) {
+            address tokenAddress;
+            assembly {
+                tokenAddress := mload(add(add(callData, 32), 4))
+            }
+            return IVaultLedger(vaultLedger).getAssetValue(tokenAddress);
+        }
+
+        // swap(address tokenIn, uint256 amountIn, address tokenOut, uint256 amountOut, address dex)
+        // value = oracle price of amountIn being sold
+        if (sel == SEL_SWAP && callData.length >= 68) {
+            address tokenIn;
+            uint256 amountIn;
+            assembly {
+                tokenIn  := mload(add(add(callData, 32),  4))
+                amountIn := mload(add(add(callData, 32), 36))
+            }
+            return IVaultLedger(vaultLedger).getTokenValue(tokenIn, amountIn);
+        }
+
+        // updateERC721(address, uint256, uint256 valuationUSD, bool, uint8, uint8)
+        // valuationUSD = param 2 at byte offset 4 + 32 + 32 = 68
+        if (sel == SEL_UPDATE_ERC721 && callData.length >= 100) {
+            uint256 valuationUSD;
+            assembly {
+                valuationUSD := mload(add(add(callData, 32), 68))
+            }
+            return valuationUSD;
+        }
+
+        // certify(uint256 tokenId, uint8, string) on ArtNFT
+        // tokenId = param 0 at offset 4 → look up valuation in VaultLedger
+        if (sel == SEL_CERTIFY && callData.length >= 36) {
+            uint256 tokenId;
+            assembly {
+                tokenId := mload(add(add(callData, 32), 4))
+            }
+            bytes32 nftKey = keccak256(abi.encodePacked(target, tokenId));
+            (, , , uint256 valuationUSD, , , ,) = IVaultLedger(vaultLedger).erc721Assets(nftKey);
+            return valuationUSD;
+        }
+
+        return 0;
+    }
+
+    // ─── Internal: Execution ─────────────────────────────────────────────────
 
     function _canAutoExecute(AssetCategory category, uint256 valueUSD) internal returns (bool) {
-        if (!categoryPermissions[category])          return false;
-        if (valueUSD > settings.valueThreshold)      return false;
+        if (!categoryPermissions[category])         return false;
+        if (valueUSD > settings.valueThreshold)     return false;
         if (block.timestamp >= _windowStart + settings.windowDuration) {
             _windowStart     = block.timestamp;
             _txCountInWindow = 0;

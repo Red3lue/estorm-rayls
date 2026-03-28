@@ -4,38 +4,125 @@ pragma solidity 0.8.24;
 import {Test} from "forge-std/Test.sol";
 import {VaultPolicy} from "../src/VaultPolicy.sol";
 import {VaultLedger} from "../src/VaultLedger.sol";
+import {PriceOracle} from "../src/PriceOracle.sol";
+import {MockDEX} from "../src/MockDEX.sol";
+import {MockERC20} from "./mocks/Mocks.sol";
+
+// ─── Test ─────────────────────────────────────────────────────────────────────
 
 contract VaultPolicyTest is Test {
-    VaultPolicy  policy;
-    VaultLedger  ledger;
+    VaultPolicy    policy;
+    VaultLedger    ledger;
+    PriceOracle    oracle;
+    MockERC20      tokenA;
+    MockERC20      tokenB;
 
     address manager = makeAddr("manager");
     address agent   = makeAddr("agent");
     address alice   = makeAddr("alice");
 
-    address constant TOKEN_A = address(0x1001);
+    // Token A: 18 decimals, price = 10_000 cents ($100/token)
+    // 1_000 tokens → value = 1_000 * 10_000 = 10_000_000 cents ($100,000)
+    uint256 constant TOKEN_A_PRICE    = 10_000;   // cents per whole token
+    uint256 constant TOKEN_A_BALANCE  = 1_000e18; // 1,000 tokens in vault
 
-    uint256 constant THRESHOLD = 5_000_000_00;
+    // Token B: 6 decimals, price = 100 cents ($1/token, stablecoin)
+    uint256 constant TOKEN_B_PRICE    = 100;      // cents per whole token
+    uint256 constant TOKEN_B_BALANCE  = 50_000e6; // 50,000 tokens in vault
+
+    // THRESHOLD > token A value ($100k) so auto-exec is easy to test
+    uint256 constant THRESHOLD = 5_000_000_00; // $5,000,000 in cents
     uint256 constant MAX_TX    = 10;
     uint256 constant WINDOW    = 3600;
 
     function setUp() public {
-        policy = new VaultPolicy(manager, agent, THRESHOLD, MAX_TX, WINDOW);
-        ledger = new VaultLedger(address(policy)); // VaultPolicy is owner
+        oracle = new PriceOracle(address(this));
+        tokenA = new MockERC20("Bond Gov 6M", 18);
+        tokenB = new MockERC20("USDR Stable",  6);
+
+        oracle.setPrice(address(tokenA), TOKEN_A_PRICE);
+        oracle.setPrice(address(tokenB), TOKEN_B_PRICE);
+
+        // Deploy ledger owned by test contract, set oracle
+        ledger = new VaultLedger(address(this), address(oracle));
+        // Deploy policy pointing to ledger
+        policy = new VaultPolicy(manager, agent, address(ledger), THRESHOLD, MAX_TX, WINDOW);
+        // Transfer ledger ownership to policy so forwarded calls pass onlyOwner
+        ledger.transferOwnership(address(policy));
+
+        // Fund vault with tokenA (tokens must be in vault before addERC20Asset)
+        tokenA.mint(address(ledger), TOKEN_A_BALANCE);
+        tokenB.mint(address(ledger), TOKEN_B_BALANCE);
     }
 
-    function _addAssetCall(address token) internal pure returns (bytes memory) {
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /// @dev addERC20Asset(address, string, uint8 riskScore, uint256 yieldBps)
+    function _addTokenA() internal pure returns (bytes memory) {
         return abi.encodeWithSignature(
-            "addERC20Asset(address,string,uint256,uint256,uint8,uint256)",
-            token, "BOND-GOV-6M", 350_000e18, 35_000_000_00, uint8(15), uint256(420)
+            "addERC20Asset(address,string,uint8,uint256)",
+            address(0x1001), "BOND-GOV-6M", uint8(15), uint256(420)
         );
     }
 
-    // ─── Auto-execution: executes call on target ──────────────────────────────
+    function _addTokenAReal() internal view returns (bytes memory) {
+        return abi.encodeWithSignature(
+            "addERC20Asset(address,string,uint8,uint256)",
+            address(tokenA), "BOND-GOV-6M", uint8(15), uint256(420)
+        );
+    }
+
+    function _addTokenBReal() internal view returns (bytes memory) {
+        return abi.encodeWithSignature(
+            "addERC20Asset(address,string,uint8,uint256)",
+            address(tokenB), "USDR-STABLE", uint8(5), uint256(0)
+        );
+    }
+
+    function _navUpdateCall() internal view returns (bytes memory) {
+        address[] memory addrs     = new address[](0);
+        uint8[]   memory risks     = new uint8[](0);
+        uint256[] memory yields    = new uint256[](0);
+        return abi.encodeWithSignature(
+            "updatePortfolio(address[],uint8[],uint256[])",
+            addrs, risks, yields
+        );
+    }
+
+    // ── Value extraction ──────────────────────────────────────────────────────
+
+    function test_extractValue_addERC20_usesOracleBalance() public {
+        // tokenA has 1_000e18 balance in vault, price = 10_000 cents
+        // expected = 1_000e18 * 10_000 / 1e18 = 10_000_000 cents ($100k)
+        uint256 val = policy.extractValue(_addTokenAReal(), address(ledger));
+        assertEq(val, 1_000 * TOKEN_A_PRICE);
+    }
+
+    function test_extractValue_swap_usesOracleAmount() public {
+        // swap 500 tokenA → some tokenB
+        // value of 500e18 tokenA at $100/token = 500 * 10_000 = 5_000_000 cents
+        bytes memory swapCall = abi.encodeWithSignature(
+            "swap(address,uint256,address,uint256,address)",
+            address(tokenA), uint256(500e18), address(tokenB), uint256(50_000e6), address(0xDEA)
+        );
+        uint256 val = policy.extractValue(swapCall, address(ledger));
+        assertEq(val, 500 * TOKEN_A_PRICE);
+    }
+
+    function test_extractValue_updatePortfolio_usesNAV() public {
+        // Register tokenA first so there's a NAV
+        vm.prank(agent);
+        policy.propose(address(ledger), _addTokenAReal(), VaultPolicy.AssetCategory.BOND, "add bond", 3);
+
+        uint256 nav = policy.extractValue(_navUpdateCall(), address(ledger));
+        assertGt(nav, 0);
+    }
+
+    // ── Auto-execution ────────────────────────────────────────────────────────
 
     function test_autoExec_executesCallOnTarget() public {
         vm.prank(agent);
-        policy.propose(address(ledger), _addAssetCall(TOKEN_A), VaultPolicy.AssetCategory.BOND, 1000_00, "add bond", 3);
+        policy.propose(address(ledger), _addTokenAReal(), VaultPolicy.AssetCategory.BOND, "add bond", 3);
         assertEq(ledger.getERC20Count(), 1);
         assertEq(policy.pendingProposalId(), 0);
     }
@@ -43,49 +130,58 @@ contract VaultPolicyTest is Test {
     function test_autoExec_emitsEvent() public {
         vm.prank(agent);
         vm.expectEmit(true, false, false, false);
-        emit VaultPolicy.ProposalAutoExecuted(1, VaultPolicy.AssetCategory.BOND, 3, 1000_00, address(ledger));
-        policy.propose(address(ledger), _addAssetCall(TOKEN_A), VaultPolicy.AssetCategory.BOND, 1000_00, "add bond", 3);
+        emit VaultPolicy.ProposalAutoExecuted(1, VaultPolicy.AssetCategory.BOND, 3, 0, address(ledger));
+        policy.propose(address(ledger), _addTokenAReal(), VaultPolicy.AssetCategory.BOND, "add bond", 3);
     }
 
-    // ─── Pending: call NOT executed until approved ────────────────────────────
+    // ── Pending: call NOT executed until approved ─────────────────────────────
 
     function test_pending_aboveThreshold_doesNotExecute() public {
+        // Add tokenA (value $100k < $5M threshold) to get NAV, then updatePortfolio has NAV > threshold
         vm.prank(agent);
-        uint256 id = policy.propose(address(ledger), _addAssetCall(TOKEN_A), VaultPolicy.AssetCategory.BOND, THRESHOLD + 1, "large", 3);
-        assertEq(ledger.getERC20Count(), 0);
+        policy.propose(address(ledger), _addTokenAReal(), VaultPolicy.AssetCategory.BOND, "add bond", 3);
+
+        // Now set threshold very low so next proposal is above it
+        vm.prank(manager);
+        policy.setValueThreshold(500_00); // $500 — below $100k tokenA value
+
+        // Proposing addTokenB (value $50k) is now above the new $500 threshold → pending
+        vm.prank(agent);
+        uint256 id = policy.propose(address(ledger), _addTokenBReal(), VaultPolicy.AssetCategory.STABLECOIN, "add usdr", 2);
         assertEq(policy.pendingProposalId(), id);
     }
 
     function test_pending_artCategory_doesNotExecute() public {
         vm.prank(agent);
-        uint256 id = policy.propose(address(ledger), _addAssetCall(TOKEN_A), VaultPolicy.AssetCategory.ART, 1000_00, "certify", 4);
+        uint256 id = policy.propose(address(ledger), _addTokenAReal(), VaultPolicy.AssetCategory.ART, "certify", 4);
         assertEq(ledger.getERC20Count(), 0);
         assertEq(policy.pendingProposalId(), id);
     }
 
     function test_pending_blocksSecondPending() public {
         vm.startPrank(agent);
-        policy.propose(address(ledger), _addAssetCall(TOKEN_A), VaultPolicy.AssetCategory.ART, 1000_00, "first", 4);
+        policy.propose(address(ledger), _addTokenAReal(), VaultPolicy.AssetCategory.ART, "first", 4);
         vm.expectRevert("pending proposal exists: resolve it first");
-        policy.propose(address(ledger), _addAssetCall(TOKEN_A), VaultPolicy.AssetCategory.ART, 1000_00, "second", 4);
+        policy.propose(address(ledger), _addTokenBReal(), VaultPolicy.AssetCategory.ART, "second", 4);
         vm.stopPrank();
     }
 
     function test_autoExecWhilePendingExists() public {
         vm.prank(agent);
-        policy.propose(address(ledger), _addAssetCall(TOKEN_A), VaultPolicy.AssetCategory.ART, 1000_00, "pending", 4);
+        policy.propose(address(ledger), _addTokenAReal(), VaultPolicy.AssetCategory.ART, "pending", 4);
+
         bytes memory readCall = abi.encodeWithSignature("getERC20Count()");
         vm.prank(agent);
-        uint256 id2 = policy.propose(address(ledger), readCall, VaultPolicy.AssetCategory.NAV_UPDATE, 0, "nav", 4);
+        uint256 id2 = policy.propose(address(ledger), readCall, VaultPolicy.AssetCategory.NAV_UPDATE, "nav", 4);
         assertGt(id2, 1);
         assertEq(policy.pendingProposalId(), 1);
     }
 
-    // ─── Approve: executes stored call ───────────────────────────────────────
+    // ── Approve ───────────────────────────────────────────────────────────────
 
     function test_approve_executesCall() public {
         vm.prank(agent);
-        uint256 id = policy.propose(address(ledger), _addAssetCall(TOKEN_A), VaultPolicy.AssetCategory.ART, 1000_00, "art", 4);
+        uint256 id = policy.propose(address(ledger), _addTokenAReal(), VaultPolicy.AssetCategory.ART, "art", 4);
         assertEq(ledger.getERC20Count(), 0);
 
         vm.prank(manager);
@@ -97,7 +193,7 @@ contract VaultPolicyTest is Test {
 
     function test_approve_emitsEvent() public {
         vm.prank(agent);
-        uint256 id = policy.propose(address(ledger), _addAssetCall(TOKEN_A), VaultPolicy.AssetCategory.ART, 1000_00, "art", 4);
+        uint256 id = policy.propose(address(ledger), _addTokenAReal(), VaultPolicy.AssetCategory.ART, "art", 4);
         vm.prank(manager);
         vm.expectEmit(true, true, false, false);
         emit VaultPolicy.ProposalApproved(id, manager);
@@ -112,7 +208,7 @@ contract VaultPolicyTest is Test {
 
     function test_approve_revertsIfAlreadyResolved() public {
         vm.prank(agent);
-        policy.propose(address(ledger), _addAssetCall(TOKEN_A), VaultPolicy.AssetCategory.ART, 1000_00, "art", 4);
+        policy.propose(address(ledger), _addTokenAReal(), VaultPolicy.AssetCategory.ART, "art", 4);
         vm.prank(manager);
         policy.approve(1);
         vm.prank(manager);
@@ -120,22 +216,22 @@ contract VaultPolicyTest is Test {
         policy.approve(1);
     }
 
-    // ─── Dismiss: discards call without executing ─────────────────────────────
+    // ── Dismiss ───────────────────────────────────────────────────────────────
 
     function test_dismiss_doesNotExecute() public {
         vm.prank(agent);
-        uint256 id = policy.propose(address(ledger), _addAssetCall(TOKEN_A), VaultPolicy.AssetCategory.ART, 1000_00, "art", 4);
+        uint256 id = policy.propose(address(ledger), _addTokenAReal(), VaultPolicy.AssetCategory.ART, "art", 4);
         vm.prank(manager);
         policy.dismiss(id);
         assertEq(ledger.getERC20Count(), 0);
         assertEq(policy.pendingProposalId(), 0);
     }
 
-    // ─── Withdraw ────────────────────────────────────────────────────────────
+    // ── Withdraw ──────────────────────────────────────────────────────────────
 
     function test_withdraw_doesNotExecute() public {
         vm.prank(agent);
-        uint256 id = policy.propose(address(ledger), _addAssetCall(TOKEN_A), VaultPolicy.AssetCategory.ART, 1000_00, "art", 4);
+        uint256 id = policy.propose(address(ledger), _addTokenAReal(), VaultPolicy.AssetCategory.ART, "art", 4);
         vm.prank(agent);
         policy.withdraw(id);
         assertEq(ledger.getERC20Count(), 0);
@@ -144,47 +240,46 @@ contract VaultPolicyTest is Test {
 
     function test_withdraw_onlyAgent() public {
         vm.prank(agent);
-        policy.propose(address(ledger), _addAssetCall(TOKEN_A), VaultPolicy.AssetCategory.ART, 1000_00, "art", 4);
+        policy.propose(address(ledger), _addTokenAReal(), VaultPolicy.AssetCategory.ART, "art", 4);
         vm.prank(manager);
         vm.expectRevert("not agent");
         policy.withdraw(1);
     }
 
-    // ─── Execution failure propagates ────────────────────────────────────────
+    // ── Execution failure propagates ──────────────────────────────────────────
 
     function test_badCallReverts() public {
         vm.prank(agent);
         vm.expectRevert();
-        policy.propose(address(ledger), abi.encodeWithSignature("nonExistentFn()"), VaultPolicy.AssetCategory.NAV_UPDATE, 0, "bad", 4);
+        policy.propose(address(ledger), abi.encodeWithSignature("nonExistentFn()"), VaultPolicy.AssetCategory.NAV_UPDATE, "bad", 4);
     }
 
-    // ─── Rate limit ──────────────────────────────────────────────────────────
+    // ── Rate limit ────────────────────────────────────────────────────────────
 
     function test_rateLimitBlocks() public {
         bytes memory cd = abi.encodeWithSignature("getERC20Count()");
         vm.startPrank(agent);
         for (uint256 i = 0; i < MAX_TX; i++) {
-            policy.propose(address(ledger), cd, VaultPolicy.AssetCategory.BOND, 1000_00, "t", 3);
+            policy.propose(address(ledger), cd, VaultPolicy.AssetCategory.BOND, "t", 3);
         }
-        uint256 id = policy.propose(address(ledger), cd, VaultPolicy.AssetCategory.BOND, 1000_00, "11th", 3);
+        uint256 id = policy.propose(address(ledger), cd, VaultPolicy.AssetCategory.BOND, "11th", 3);
         assertEq(policy.pendingProposalId(), id);
         vm.stopPrank();
     }
 
-
-    // ─── Emergency stop ──────────────────────────────────────────────────────
+    // ── Emergency stop ────────────────────────────────────────────────────────
 
     function test_emergencyStop_blocksPropose() public {
         vm.prank(manager);
         policy.emergencyStop();
         vm.prank(agent);
         vm.expectRevert("emergency stop active");
-        policy.propose(address(ledger), "", VaultPolicy.AssetCategory.BOND, 0, "", 3);
+        policy.propose(address(ledger), "", VaultPolicy.AssetCategory.BOND, "", 3);
     }
 
     function test_emergencyStop_blocksApprove() public {
         vm.prank(agent);
-        policy.propose(address(ledger), _addAssetCall(TOKEN_A), VaultPolicy.AssetCategory.ART, 1000_00, "art", 4);
+        policy.propose(address(ledger), _addTokenAReal(), VaultPolicy.AssetCategory.ART, "art", 4);
         vm.prank(manager);
         policy.emergencyStop();
         vm.prank(manager);
@@ -201,31 +296,31 @@ contract VaultPolicyTest is Test {
         assertFalse(paused);
     }
 
-    // ─── Access control ──────────────────────────────────────────────────────
+    // ── Access control ────────────────────────────────────────────────────────
 
     function test_onlyAgent_propose() public {
         vm.prank(alice);
         vm.expectRevert("not agent");
-        policy.propose(address(ledger), "", VaultPolicy.AssetCategory.BOND, 0, "", 0);
+        policy.propose(address(ledger), "", VaultPolicy.AssetCategory.BOND, "", 0);
     }
 
     function test_onlyManager_approve() public { vm.prank(alice); vm.expectRevert("not manager"); policy.approve(1); }
     function test_onlyManager_dismiss() public  { vm.prank(alice); vm.expectRevert("not manager"); policy.dismiss(1); }
     function test_onlyAgent_withdraw() public   { vm.prank(alice); vm.expectRevert("not agent");   policy.withdraw(1); }
 
-    // ─── Read ─────────────────────────────────────────────────────────────────
+    // ── Read ──────────────────────────────────────────────────────────────────
 
     function test_getSettings() public view {
         (VaultPolicy.GovernanceSettings memory s, bool[6] memory perms) = policy.getSettings();
         assertEq(s.valueThreshold, THRESHOLD);
         assertEq(s.maxTxPerWindow, MAX_TX);
-        assertTrue(perms[0]);  // BOND
-        assertFalse(perms[3]); // ART
+        assertTrue(perms[0]);   // BOND
+        assertFalse(perms[3]);  // ART
     }
 
     function test_getPendingProposal() public {
         vm.prank(agent);
-        policy.propose(address(ledger), _addAssetCall(TOKEN_A), VaultPolicy.AssetCategory.ART, 1000_00, "certify Picasso", 4);
+        policy.propose(address(ledger), _addTokenAReal(), VaultPolicy.AssetCategory.ART, "certify Picasso", 4);
         VaultPolicy.Proposal memory p = policy.getPendingProposal();
         assertEq(p.id,        1);
         assertEq(p.reasoning, "certify Picasso");
@@ -238,10 +333,11 @@ contract VaultPolicyTest is Test {
     }
 
     function test_getProposalHistory() public {
+        bytes memory cd = abi.encodeWithSignature("getERC20Count()");
         vm.prank(agent);
-        policy.propose(address(ledger), _addAssetCall(TOKEN_A), VaultPolicy.AssetCategory.BOND, 1000_00, "auto", 3);
+        policy.propose(address(ledger), cd, VaultPolicy.AssetCategory.BOND, "auto", 3);
         vm.prank(agent);
-        policy.propose(address(ledger), _addAssetCall(TOKEN_A), VaultPolicy.AssetCategory.ART,  1000_00, "pending", 4);
+        policy.propose(address(ledger), _addTokenAReal(), VaultPolicy.AssetCategory.ART, "pending", 4);
         VaultPolicy.Proposal[] memory h = policy.getProposalHistory();
         assertEq(h.length, 2);
         assertEq(uint8(h[0].status), uint8(VaultPolicy.ProposalStatus.AUTO_EXECUTED));
@@ -260,7 +356,7 @@ contract VaultPolicyTest is Test {
         policy.setCategoryPermission(VaultPolicy.AssetCategory.ART, true);
         assertTrue(policy.categoryPermissions(VaultPolicy.AssetCategory.ART));
         vm.prank(agent);
-        uint256 id = policy.propose(address(ledger), _addAssetCall(TOKEN_A), VaultPolicy.AssetCategory.ART, 1000_00, "certify", 4);
+        uint256 id = policy.propose(address(ledger), _addTokenAReal(), VaultPolicy.AssetCategory.ART, "certify", 4);
         assertEq(policy.pendingProposalId(), 0);
         assertGt(id, 0);
     }
@@ -268,28 +364,57 @@ contract VaultPolicyTest is Test {
     function test_getRateLimitStatus() public {
         bytes memory cd = abi.encodeWithSignature("getERC20Count()");
         vm.startPrank(agent);
-        policy.propose(address(ledger), cd, VaultPolicy.AssetCategory.BOND, 1000_00, "t1", 3);
-        policy.propose(address(ledger), cd, VaultPolicy.AssetCategory.BOND, 1000_00, "t2", 3);
+        policy.propose(address(ledger), cd, VaultPolicy.AssetCategory.BOND, "t1", 3);
+        policy.propose(address(ledger), cd, VaultPolicy.AssetCategory.BOND, "t2", 3);
         vm.stopPrank();
         (uint256 used, uint256 max,) = policy.getRateLimitStatus();
         assertEq(used, 2);
         assertEq(max, MAX_TX);
     }
+
     function test_rateLimitResetsAfterWindow() public {
         bytes memory cd = abi.encodeWithSignature("getERC20Count()");
         vm.startPrank(agent);
         for (uint256 i = 0; i < MAX_TX; i++) {
-            policy.propose(address(ledger), cd, VaultPolicy.AssetCategory.BOND, 1000_00, "t", 3);
+            policy.propose(address(ledger), cd, VaultPolicy.AssetCategory.BOND, "t", 3);
         }
-        // 11th hits rate limit → pending
-        uint256 pendingId = policy.propose(address(ledger), cd, VaultPolicy.AssetCategory.BOND, 1000_00, "11th", 3);
+        uint256 pendingId = policy.propose(address(ledger), cd, VaultPolicy.AssetCategory.BOND, "11th", 3);
         vm.stopPrank();
         vm.prank(manager);
         policy.dismiss(pendingId);
         vm.warp(block.timestamp + WINDOW + 1);
         vm.prank(agent);
-        uint256 id = policy.propose(address(ledger), cd, VaultPolicy.AssetCategory.BOND, 1000_00, "new window", 3);
+        uint256 id = policy.propose(address(ledger), cd, VaultPolicy.AssetCategory.BOND, "new window", 3);
         assertEq(policy.pendingProposalId(), 0);
         assertGt(id, 0);
+    }
+
+    // ── Swap via VaultLedger ──────────────────────────────────────────────────
+
+    function test_swap_executesViaPolicy() public {
+        MockDEX dex = new MockDEX();
+
+        // Fund DEX with tokenB reserves (so it can fulfill the swap)
+        tokenB.mint(address(dex), 50_000e6);
+
+        // Register both assets in ledger via policy
+        vm.prank(agent);
+        policy.propose(address(ledger), _addTokenAReal(), VaultPolicy.AssetCategory.BOND, "add A", 3);
+        vm.prank(agent);
+        policy.propose(address(ledger), _addTokenBReal(), VaultPolicy.AssetCategory.STABLECOIN, "add B", 2);
+
+        uint256 navBefore = ledger.getNAV();
+
+        // Propose swap: sell 100 tokenA for 10,000 tokenB
+        bytes memory swapCall = abi.encodeWithSignature(
+            "swap(address,uint256,address,uint256,address)",
+            address(tokenA), uint256(100e18), address(tokenB), uint256(10_000e6), address(dex)
+        );
+        vm.prank(agent);
+        policy.propose(address(ledger), swapCall, VaultPolicy.AssetCategory.BOND, "rebalance to stables", 3);
+
+        // Vault should now have 900 tokenA and 60,000 tokenB
+        assertEq(tokenA.balanceOf(address(ledger)), TOKEN_A_BALANCE - 100e18);
+        assertEq(tokenB.balanceOf(address(ledger)), TOKEN_B_BALANCE + 10_000e6);
     }
 }
