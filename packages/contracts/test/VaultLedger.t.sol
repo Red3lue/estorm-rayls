@@ -3,44 +3,90 @@ pragma solidity 0.8.24;
 
 import {Test} from "forge-std/Test.sol";
 import {VaultLedger} from "../src/VaultLedger.sol";
+import {PriceOracle} from "../src/PriceOracle.sol";
+import {MockDEX} from "../src/MockDEX.sol";
+import {MockERC20} from "./mocks/Mocks.sol";
 
 contract VaultLedgerTest is Test {
     VaultLedger ledger;
+    PriceOracle oracle;
+    MockERC20   bond;
+    MockERC20   recvA;
+    MockERC20   stable;
+
     address owner = address(this);
-    address agent = makeAddr("agent");
     address alice = makeAddr("alice");
 
-    // Fake token addresses
-    address constant BOND     = address(0x1001);
-    address constant RECV_A   = address(0x1002);
-    address constant STABLE   = address(0x1003);
-    address constant PICASSO  = address(0x2001);
-    address constant WARHOL   = address(0x2002);
+    address constant PICASSO = address(0x2001);
+    address constant WARHOL  = address(0x2002);
+
+    // bond:   18 dec, 1_000 tokens at $1_000 → $1_000_000 = 100_000_000 cents
+    // recvA:  18 dec,   500 tokens at $1_000 → $500_000   =  50_000_000 cents
+    // stable:  6 dec, 500_000 tokens at $1   → $500_000   =  50_000_000 cents
+    // total NAV = 200_000_000 cents = $2_000_000
+    uint256 constant BOND_PRICE    = 100_000; // cents per whole token
+    uint256 constant RECV_PRICE    = 100_000;
+    uint256 constant STABLE_PRICE  = 100;
+
+    uint256 constant BOND_BALANCE   = 1_000e18;
+    uint256 constant RECV_BALANCE   =   500e18;
+    uint256 constant STABLE_BALANCE = 500_000e6;
+
+    uint256 constant BOND_VALUE     = 1_000 * BOND_PRICE;          // 100_000_000
+    uint256 constant RECV_VALUE     =   500 * RECV_PRICE;          //  50_000_000
+    uint256 constant STABLE_VALUE   = 500_000 * STABLE_PRICE;      //  50_000_000
+    uint256 constant TOTAL_NAV      = BOND_VALUE + RECV_VALUE + STABLE_VALUE; // 200_000_000
 
     function setUp() public {
-        ledger = new VaultLedger(owner);
+        oracle = new PriceOracle(address(this));
+        bond   = new MockERC20("BOND-GOV-6M", 18);
+        recvA  = new MockERC20("RECV-ACME",   18);
+        stable = new MockERC20("STABLE-USDr",  6);
+
+        oracle.setPrice(address(bond),   BOND_PRICE);
+        oracle.setPrice(address(recvA),  RECV_PRICE);
+        oracle.setPrice(address(stable), STABLE_PRICE);
+
+        ledger = new VaultLedger(owner, address(oracle));
+
+        // Fund vault (tokens must be in vault before addERC20Asset)
+        bond.mint(address(ledger),   BOND_BALANCE);
+        recvA.mint(address(ledger),  RECV_BALANCE);
+        stable.mint(address(ledger), STABLE_BALANCE);
     }
 
     // ─── addERC20Asset ───────────────────────────────────────────────────────
 
-    function test_addERC20Asset() public {
-        ledger.addERC20Asset(BOND, "BOND-GOV-6M", 350_000e18, 35_000_000_00, 15, 420);
-        (address addr, string memory sym,,,,,, bool active) = ledger.erc20Assets(BOND);
-        assertEq(addr, BOND);
-        assertEq(sym, "BOND-GOV-6M");
+    function test_addERC20Asset_registersAsset() public {
+        ledger.addERC20Asset(address(bond), "BOND-GOV-6M", 15, 420);
+        (address addr, string memory sym,,,,,,, bool active) = ledger.erc20Assets(address(bond));
+        assertEq(addr, address(bond));
+        assertEq(sym,  "BOND-GOV-6M");
         assertTrue(active);
     }
 
+    function test_addERC20Asset_readsBalanceFromChain() public {
+        ledger.addERC20Asset(address(bond), "BOND-GOV-6M", 15, 420);
+        (,,,uint256 bal,,,,, ) = ledger.erc20Assets(address(bond));
+        assertEq(bal, BOND_BALANCE);
+    }
+
+    function test_addERC20Asset_derivesValueFromOracle() public {
+        ledger.addERC20Asset(address(bond), "BOND-GOV-6M", 15, 420);
+        (,,,,uint256 val,,,, ) = ledger.erc20Assets(address(bond));
+        assertEq(val, BOND_VALUE);
+    }
+
     function test_addERC20Asset_revertsOnDuplicate() public {
-        ledger.addERC20Asset(BOND, "BOND-GOV-6M", 350_000e18, 35_000_000_00, 15, 420);
+        ledger.addERC20Asset(address(bond), "BOND-GOV-6M", 15, 420);
         vm.expectRevert("already registered");
-        ledger.addERC20Asset(BOND, "BOND-GOV-6M", 350_000e18, 35_000_000_00, 15, 420);
+        ledger.addERC20Asset(address(bond), "BOND-GOV-6M", 15, 420);
     }
 
     function test_addERC20Asset_onlyOwner() public {
         vm.prank(alice);
         vm.expectRevert();
-        ledger.addERC20Asset(BOND, "BOND-GOV-6M", 350_000e18, 35_000_000_00, 15, 420);
+        ledger.addERC20Asset(address(bond), "BOND-GOV-6M", 15, 420);
     }
 
     // ─── getNAV ──────────────────────────────────────────────────────────────
@@ -50,63 +96,96 @@ contract VaultLedgerTest is Test {
     }
 
     function test_getNAV_singleAsset() public {
-        ledger.addERC20Asset(BOND, "BOND-GOV-6M", 350_000e18, 35_000_000_00, 15, 420);
-        assertEq(ledger.getNAV(), 35_000_000_00);
+        ledger.addERC20Asset(address(bond), "BOND-GOV-6M", 15, 420);
+        assertEq(ledger.getNAV(), BOND_VALUE);
     }
 
     function test_getNAV_multipleAssets() public {
-        ledger.addERC20Asset(BOND,   "BOND-GOV-6M",   350_000e18, 35_000_000_00, 15,  420);
-        ledger.addERC20Asset(RECV_A, "RECV-ACME-90D", 200_000e18, 20_000_000_00, 55, 1100);
-        ledger.addERC20Asset(STABLE, "STABLE-USDr",   200_000e6,  20_000_000_00,  0,    0);
-        assertEq(ledger.getNAV(), 75_000_000_00);
+        ledger.addERC20Asset(address(bond),   "BOND-GOV-6M",   15,  420);
+        ledger.addERC20Asset(address(recvA),  "RECV-ACME-90D", 55, 1100);
+        ledger.addERC20Asset(address(stable), "STABLE-USDr",    0,    0);
+        assertEq(ledger.getNAV(), TOTAL_NAV);
     }
 
     // ─── updatePortfolio ─────────────────────────────────────────────────────
 
-    function test_updatePortfolio() public {
-        ledger.addERC20Asset(BOND,   "BOND-GOV-6M",   350_000e18, 35_000_000_00, 15,  420);
-        ledger.addERC20Asset(RECV_A, "RECV-ACME-90D", 200_000e18, 20_000_000_00, 55, 1100);
+    function test_updatePortfolio_refreshesFromChain() public {
+        ledger.addERC20Asset(address(bond),  "BOND-GOV-6M",   15,  420);
+        ledger.addERC20Asset(address(recvA), "RECV-ACME-90D", 55, 1100);
 
-        address[] memory addrs   = new address[](2);
-        uint256[] memory bals    = new uint256[](2);
-        uint256[] memory vals    = new uint256[](2);
-        uint8[]   memory risks   = new uint8[](2);
-        uint256[] memory yields  = new uint256[](2);
+        // Simulate a trade: vault gets 200 more bond, loses 100 recvA
+        bond.mint(address(ledger),  200e18);
+        recvA.burn(address(ledger), 100e18);
 
-        addrs[0] = BOND;   bals[0] = 400_000e18; vals[0] = 40_000_000_00; risks[0] = 12; yields[0] = 450;
-        addrs[1] = RECV_A; bals[1] = 150_000e18; vals[1] = 15_000_000_00; risks[1] = 60; yields[1] = 900;
+        address[] memory addrs  = new address[](2);
+        uint8[]   memory risks  = new uint8[](2);
+        uint256[] memory yields = new uint256[](2);
+        addrs[0]  = address(bond);  risks[0]  = 12; yields[0] = 450;
+        addrs[1]  = address(recvA); risks[1]  = 60; yields[1] = 900;
 
-        ledger.updatePortfolio(addrs, bals, vals, risks, yields);
+        ledger.updatePortfolio(addrs, risks, yields);
 
-        assertEq(ledger.getNAV(),      55_000_000_00);
-        assertEq(ledger.lastNAV(),     55_000_000_00);
+        // bond: 1200 * 100_000 = 120_000_000
+        // recvA: 400 * 100_000 = 40_000_000
+        assertEq(ledger.getNAV(), (1_200 * BOND_PRICE) + (400 * RECV_PRICE));
         assertGt(ledger.lastUpdated(), 0);
     }
 
     function test_updatePortfolio_emitsEvent() public {
-        ledger.addERC20Asset(BOND, "BOND-GOV-6M", 350_000e18, 35_000_000_00, 15, 420);
-
+        ledger.addERC20Asset(address(bond), "BOND-GOV-6M", 15, 420);
         address[] memory addrs  = new address[](1);
-        uint256[] memory bals   = new uint256[](1);
-        uint256[] memory vals   = new uint256[](1);
         uint8[]   memory risks  = new uint8[](1);
         uint256[] memory yields = new uint256[](1);
-        addrs[0] = BOND; bals[0] = 350_000e18; vals[0] = 36_000_000_00; risks[0] = 15; yields[0] = 420;
+        addrs[0] = address(bond); risks[0] = 15; yields[0] = 420;
 
         vm.expectEmit(false, false, false, false);
         emit VaultLedger.PortfolioUpdated(0, 0);
-        ledger.updatePortfolio(addrs, bals, vals, risks, yields);
+        ledger.updatePortfolio(addrs, risks, yields);
     }
 
     function test_updatePortfolio_revertsOnUnknownAsset() public {
         address[] memory addrs  = new address[](1);
-        uint256[] memory bals   = new uint256[](1);
-        uint256[] memory vals   = new uint256[](1);
         uint8[]   memory risks  = new uint8[](1);
         uint256[] memory yields = new uint256[](1);
-        addrs[0] = BOND;
+        addrs[0] = address(bond);
         vm.expectRevert("unknown asset");
-        ledger.updatePortfolio(addrs, bals, vals, risks, yields);
+        ledger.updatePortfolio(addrs, risks, yields);
+    }
+
+    // ─── getAssetValue / getTokenValue ───────────────────────────────────────
+
+    function test_getAssetValue_liveBalance() public view {
+        // bond not registered yet, falls back to token.decimals()
+        uint256 val = ledger.getAssetValue(address(bond));
+        assertEq(val, BOND_VALUE);
+    }
+
+    function test_getTokenValue() public view {
+        uint256 val = ledger.getTokenValue(address(bond), 100e18);
+        assertEq(val, 100 * BOND_PRICE); // 100 tokens * $1000 = $100,000
+    }
+
+    // ─── swap ────────────────────────────────────────────────────────────────
+
+    function test_swap_updatesBalances() public {
+        ledger.addERC20Asset(address(bond),   "BOND-GOV-6M",  15,  420);
+        ledger.addERC20Asset(address(stable), "STABLE-USDr",   0,    0);
+
+        MockDEX dex = new MockDEX();
+        // Pre-fund DEX with stable reserves
+        stable.mint(address(dex), 100_000e6);
+
+        // Sell 100 bond for 10_000 stable
+        ledger.swap(address(bond), 100e18, address(stable), 10_000e6, address(dex));
+
+        assertEq(bond.balanceOf(address(ledger)),   BOND_BALANCE   - 100e18);
+        assertEq(stable.balanceOf(address(ledger)), STABLE_BALANCE + 10_000e6);
+    }
+
+    function test_swap_revertsUnregisteredToken() public {
+        ledger.addERC20Asset(address(bond), "BOND-GOV-6M", 15, 420);
+        vm.expectRevert("tokenOut not registered");
+        ledger.swap(address(bond), 100e18, address(stable), 10_000e6, address(0xDEA));
     }
 
     // ─── addERC721Asset ──────────────────────────────────────────────────────
@@ -122,7 +201,7 @@ contract VaultLedgerTest is Test {
         ledger.addERC721Asset(PICASSO, 1, "ART-PICASSO-01", 50_000_000_00, 20);
     }
 
-    function test_addERC721Asset_differentTokenIdsSameAddress() public {
+    function test_addERC721Asset_differentTokenIds() public {
         ledger.addERC721Asset(PICASSO, 1, "ART-PICASSO-01", 50_000_000_00, 20);
         ledger.addERC721Asset(PICASSO, 2, "ART-PICASSO-02", 30_000_000_00, 22);
         assertEq(ledger.getERC721Count(), 2);
@@ -133,10 +212,9 @@ contract VaultLedgerTest is Test {
     function test_updateERC721_certify() public {
         ledger.addERC721Asset(PICASSO, 1, "ART-PICASSO-01", 50_000_000_00, 20);
         ledger.updateERC721(PICASSO, 1, 55_000_000_00, true, 85, 18);
-
         bytes32 key = keccak256(abi.encodePacked(PICASSO, uint256(1)));
-        (,, , uint256 val, bool cert, uint8 score, uint8 risk,) = ledger.erc721Assets(key);
-        assertEq(val,   55_000_000_00);
+        (,,, uint256 val, bool cert, uint8 score, uint8 risk,) = ledger.erc721Assets(key);
+        assertEq(val,  55_000_000_00);
         assertTrue(cert);
         assertEq(score, 85);
         assertEq(risk,  18);
@@ -157,8 +235,8 @@ contract VaultLedgerTest is Test {
     // ─── getVaultSnapshot ────────────────────────────────────────────────────
 
     function test_getVaultSnapshot() public {
-        ledger.addERC20Asset(BOND,   "BOND-GOV-6M",   350_000e18, 35_000_000_00, 15, 420);
-        ledger.addERC20Asset(STABLE, "STABLE-USDr",   200_000e6,  20_000_000_00,  0,   0);
+        ledger.addERC20Asset(address(bond),   "BOND-GOV-6M",   15, 420);
+        ledger.addERC20Asset(address(stable), "STABLE-USDr",    0,   0);
         ledger.addERC721Asset(PICASSO, 1, "ART-PICASSO-01", 50_000_000_00, 20);
         ledger.addERC721Asset(WARHOL,  1, "ART-WARHOL-01",  25_000_000_00, 25);
 
@@ -171,28 +249,38 @@ contract VaultLedgerTest is Test {
         assertEq(nfts[0].symbol,     "ART-PICASSO-01");
     }
 
+    // ─── allocationPct ───────────────────────────────────────────────────────
+
+    function test_allocationPctRecomputed() public {
+        // BOND $1M, RECV $500K, STABLE $500K → total $2M
+        // BOND = 100M/200M * 100 = 50%, RECV = 25%, STABLE = 25%
+        ledger.addERC20Asset(address(bond),   "BOND-GOV-6M",   15,  420);
+        ledger.addERC20Asset(address(recvA),  "RECV-ACME-90D", 55, 1100);
+        ledger.addERC20Asset(address(stable), "STABLE-USDr",    0,    0);
+
+        (,,,,, uint8 pct,,,) = ledger.erc20Assets(address(bond));
+        assertEq(pct, 50);
+    }
+
     // ─── recordTrade / getTradeHistory ───────────────────────────────────────
 
     function test_recordTrade() public {
-        ledger.addERC20Asset(BOND, "BOND-GOV-6M", 350_000e18, 35_000_000_00, 15, 420);
-        uint256 navBefore = ledger.getNAV();
-        ledger.recordTrade(VaultLedger.TradeAction.REBALANCE, "Yield rebalance: bonds +5%", navBefore, 3, false);
+        ledger.addERC20Asset(address(bond), "BOND-GOV-6M", 15, 420);
+        ledger.recordTrade(VaultLedger.TradeAction.REBALANCE, "Yield rebalance", ledger.getNAV(), 3, false);
         assertEq(ledger.getTradeCount(), 1);
     }
 
     function test_recordTrade_storesFields() public {
-        ledger.addERC20Asset(BOND, "BOND-GOV-6M", 350_000e18, 35_000_000_00, 15, 420);
         ledger.recordTrade(VaultLedger.TradeAction.CERTIFY, "Picasso certified", 0, 4, true);
         VaultLedger.TradeRecord[] memory history = ledger.getTradeHistory();
-        assertEq(history.length,           1);
-        assertEq(history[0].description,   "Picasso certified");
-        assertEq(history[0].quorumVotes,   4);
+        assertEq(history.length,            1);
+        assertEq(history[0].description,    "Picasso certified");
+        assertEq(history[0].quorumVotes,    4);
         assertTrue(history[0].humanApproved);
-        assertGt(history[0].timestamp,     0);
+        assertGt(history[0].timestamp,      0);
     }
 
     function test_recordTrade_emitsEvent() public {
-        ledger.addERC20Asset(BOND, "BOND-GOV-6M", 350_000e18, 35_000_000_00, 15, 420);
         vm.expectEmit(true, false, false, false);
         emit VaultLedger.TradeRecorded(0, VaultLedger.TradeAction.REBALANCE, 0, false);
         ledger.recordTrade(VaultLedger.TradeAction.REBALANCE, "test", 0, 3, false);
@@ -205,24 +293,11 @@ contract VaultLedgerTest is Test {
     }
 
     function test_multipleTradeRecords() public {
-        ledger.addERC20Asset(BOND, "BOND-GOV-6M", 350_000e18, 35_000_000_00, 15, 420);
-        ledger.recordTrade(VaultLedger.TradeAction.REBALANCE, "Rebalance 1", 0, 3, false);
-        ledger.recordTrade(VaultLedger.TradeAction.CERTIFY,   "Certify art", 0, 4, true);
-        ledger.recordTrade(VaultLedger.TradeAction.ISSUE,     "Issue receipt", 0, 4, false);
+        ledger.recordTrade(VaultLedger.TradeAction.REBALANCE, "r1",  0, 3, false);
+        ledger.recordTrade(VaultLedger.TradeAction.CERTIFY,   "c1",  0, 4, true);
+        ledger.recordTrade(VaultLedger.TradeAction.ISSUE,     "i1",  0, 4, false);
         assertEq(ledger.getTradeCount(), 3);
         VaultLedger.TradeRecord[] memory h = ledger.getTradeHistory();
         assertEq(uint8(h[1].action), uint8(VaultLedger.TradeAction.CERTIFY));
-    }
-
-    // ─── allocation pct ──────────────────────────────────────────────────────
-
-    function test_allocationPctRecomputed() public {
-        // $350K + $200K + $200K = $750K. BOND = 46%, RECV = 26%, STABLE = 26%
-        ledger.addERC20Asset(BOND,   "BOND-GOV-6M",   350_000e18, 35_000_000_00, 15, 420);
-        ledger.addERC20Asset(RECV_A, "RECV-ACME-90D", 200_000e18, 20_000_000_00, 55, 1100);
-        ledger.addERC20Asset(STABLE, "STABLE-USDr",   200_000e6,  20_000_000_00,  0,    0);
-
-        (,,,, uint8 pct,,,) = ledger.erc20Assets(BOND);
-        assertEq(pct, 46); // 35/75 * 100 = 46 (integer division)
     }
 }
