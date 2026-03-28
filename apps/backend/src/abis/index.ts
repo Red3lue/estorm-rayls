@@ -14,6 +14,14 @@ export const ERC721_ABI = [
   "function balanceOf(address) view returns (uint256)",
 ] as const;
 
+/** Demo Attestation.sol on Public Chain (US-2B.1 extended schema) */
+export const ATTESTATION_ABI = [
+  "function attest(address token, bool approved, string reason, uint256 score, uint8 decisionType, uint8 decisionOrigin, uint8 quorumVotes, uint8 quorumTotal, uint256 nav, uint256 riskScore, string portfolioBreakdown, string yieldHistory) external",
+  "function getAttestations(address token) view returns (tuple(address attester, address token, bool approved, string reason, uint256 score, uint256 timestamp, uint8 decisionType, uint8 decisionOrigin, uint8 quorumVotes, uint8 quorumTotal, uint256 nav, uint256 riskScore, string portfolioBreakdown, string yieldHistory)[])",
+  "function getAttestationCount(address token) view returns (uint256)",
+  "event Attested(address indexed token, address indexed attester, bool approved, uint256 score, uint8 decisionType)",
+] as const;
+
 /** Matches VaultLedger.sol deployed on feat/2A.3 */
 export const VAULT_LEDGER_ABI = [
   "function getNAV() view returns (uint256)",
