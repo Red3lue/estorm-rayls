@@ -7,19 +7,19 @@
     "packages/*"
   ],
   "scripts": {
-    "dev:frontend": "yarn workspace frontend dev",
-    "dev:backend": "yarn workspace backend dev",
-    "dev": "concurrently \"yarn dev:frontend\" \"yarn dev:backend\"",
-    "build:contracts": "yarn workspace contracts build",
-    "test:contracts": "yarn workspace contracts test",
-    "deploy:contracts:private": "yarn workspace contracts deploy:private",
-    "deploy:contracts:public": "yarn workspace contracts deploy:public"
+    "dev:frontend": "npm run dev --workspace=frontend",
+    "dev:backend": "npm run dev --workspace=backend",
+    "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
+    "build:contracts": "npm run build --workspace=contracts",
+    "test:contracts": "npm run test --workspace=contracts",
+    "deploy:contracts:private": "npm run deploy:private --workspace=contracts",
+    "deploy:contracts:public": "npm run deploy:public --workspace=contracts"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
   },
-  "packageManager": "yarn@4.6.0",
   "dependencies": {
     "@openzeppelin/contracts-upgradeable": "^5.4.0"
-  }
+  },
+  "packageManager": "npm@10.9.2"
 }
