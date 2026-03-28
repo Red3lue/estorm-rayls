@@ -22,7 +22,11 @@ export const ATTESTATION_ABI = [
   "event Attested(address indexed token, address indexed attester, bool approved, uint256 score, uint8 decisionType)",
 ] as const;
 
-/** Matches VaultLedger.sol deployed on feat/2A.3 */
+/**
+ * VaultLedger ABI — must match the DEPLOYED contract, not the source.
+ * Current deployment: old struct WITHOUT decimals field.
+ * When SC dev redeploys with decimals, add `uint8 decimals` after `string symbol`.
+ */
 export const VAULT_LEDGER_ABI = [
   "function getNAV() view returns (uint256)",
   "function getVaultSnapshot() view returns (tuple(address tokenAddress, string symbol, uint256 balance, uint256 valueUSD, uint8 allocationPct, uint8 riskScore, uint256 yieldBps, bool active)[], tuple(address tokenAddress, uint256 tokenId, string symbol, uint256 valuationUSD, bool certified, uint8 certScore, uint8 riskScore, bool active)[])",
