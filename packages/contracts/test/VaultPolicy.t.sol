@@ -170,7 +170,7 @@ contract VaultPolicyTest is Test {
         vm.prank(agent);
         policy.propose(address(ledger), _addTokenAReal(), VaultPolicy.AssetCategory.ART, "pending", 4);
 
-        bytes memory readCall = abi.encodeWithSignature("getERC20Count()");
+        bytes memory readCall = _navUpdateCall();
         vm.prank(agent);
         uint256 id2 = policy.propose(address(ledger), readCall, VaultPolicy.AssetCategory.NAV_UPDATE, "nav", 4);
         assertGt(id2, 1);
@@ -246,18 +246,85 @@ contract VaultPolicyTest is Test {
         policy.withdraw(1);
     }
 
+    // ── Selector allowlist ────────────────────────────────────────────────────
+
+    function test_unknownSelector_reverts() public {
+        vm.prank(agent);
+        vm.expectRevert("selector not allowed");
+        // transferOwnership — dangerous, must never be proposable
+        policy.propose(
+            address(ledger),
+            abi.encodeWithSignature("transferOwnership(address)", address(0xdead)),
+            VaultPolicy.AssetCategory.NAV_UPDATE, "hijack", 0
+        );
+    }
+
+    function test_emptyCalldata_reverts() public {
+        vm.prank(agent);
+        vm.expectRevert("calldata too short");
+        policy.propose(address(ledger), "", VaultPolicy.AssetCategory.BOND, "empty", 0);
+    }
+
+    function test_setAllowedSelector_addNew() public {
+        bytes4 sel = bytes4(keccak256("someNewOp(uint256)"));
+        assertFalse(policy.allowedSelectors(sel));
+        vm.prank(manager);
+        policy.setAllowedSelector(sel, true);
+        assertTrue(policy.allowedSelectors(sel));
+    }
+
+    function test_setAllowedSelector_removeExisting() public {
+        // Remove swap from whitelist
+        vm.prank(manager);
+        policy.setAllowedSelector(bytes4(keccak256("swap(address,uint256,address,uint256,address)")), false);
+
+        bytes memory swapCall = abi.encodeWithSignature(
+            "swap(address,uint256,address,uint256,address)",
+            address(tokenA), uint256(100e18), address(tokenB), uint256(1_000e6), address(0xDEA)
+        );
+        vm.prank(agent);
+        vm.expectRevert("selector not allowed");
+        policy.propose(address(ledger), swapCall, VaultPolicy.AssetCategory.BOND, "swap", 3);
+    }
+
+    function test_setAllowedSelector_onlyManager() public {
+        vm.prank(alice);
+        vm.expectRevert("not manager");
+        policy.setAllowedSelector(bytes4(keccak256("anything()")), true);
+    }
+
+    function test_dewhitelisted_pendingProposal_revertsOnApprove() public {
+        // Queue a proposal
+        vm.prank(agent);
+        uint256 id = policy.propose(address(ledger), _addTokenAReal(), VaultPolicy.AssetCategory.ART, "art", 4);
+
+        // Manager de-whitelists the selector after queuing
+        vm.prank(manager);
+        policy.setAllowedSelector(bytes4(keccak256("addERC20Asset(address,string,uint8,uint256)")), false);
+
+        // Approval should revert at _execute's defense-in-depth check
+        vm.prank(manager);
+        vm.expectRevert("selector not allowed");
+        policy.approve(id);
+    }
+
     // ── Execution failure propagates ──────────────────────────────────────────
 
     function test_badCallReverts() public {
+        // whitelisted selector but the actual call fails (e.g. wrong args)
+        bytes memory badArgs = abi.encodeWithSignature(
+            "addERC20Asset(address,string,uint8,uint256)",
+            address(0), "BAD", uint8(0), uint256(0)  // zero address → reverts in VaultLedger
+        );
         vm.prank(agent);
         vm.expectRevert();
-        policy.propose(address(ledger), abi.encodeWithSignature("nonExistentFn()"), VaultPolicy.AssetCategory.NAV_UPDATE, "bad", 4);
+        policy.propose(address(ledger), badArgs, VaultPolicy.AssetCategory.BOND, "bad", 3);
     }
 
     // ── Rate limit ────────────────────────────────────────────────────────────
 
     function test_rateLimitBlocks() public {
-        bytes memory cd = abi.encodeWithSignature("getERC20Count()");
+        bytes memory cd = _navUpdateCall();
         vm.startPrank(agent);
         for (uint256 i = 0; i < MAX_TX; i++) {
             policy.propose(address(ledger), cd, VaultPolicy.AssetCategory.BOND, "t", 3);
@@ -274,7 +341,7 @@ contract VaultPolicyTest is Test {
         policy.emergencyStop();
         vm.prank(agent);
         vm.expectRevert("emergency stop active");
-        policy.propose(address(ledger), "", VaultPolicy.AssetCategory.BOND, "", 3);
+        policy.propose(address(ledger), _navUpdateCall(), VaultPolicy.AssetCategory.BOND, "", 3);
     }
 
     function test_emergencyStop_blocksApprove() public {
@@ -301,7 +368,7 @@ contract VaultPolicyTest is Test {
     function test_onlyAgent_propose() public {
         vm.prank(alice);
         vm.expectRevert("not agent");
-        policy.propose(address(ledger), "", VaultPolicy.AssetCategory.BOND, "", 0);
+        policy.propose(address(ledger), _navUpdateCall(), VaultPolicy.AssetCategory.BOND, "", 0);
     }
 
     function test_onlyManager_approve() public { vm.prank(alice); vm.expectRevert("not manager"); policy.approve(1); }
@@ -333,7 +400,7 @@ contract VaultPolicyTest is Test {
     }
 
     function test_getProposalHistory() public {
-        bytes memory cd = abi.encodeWithSignature("getERC20Count()");
+        bytes memory cd = _navUpdateCall();
         vm.prank(agent);
         policy.propose(address(ledger), cd, VaultPolicy.AssetCategory.BOND, "auto", 3);
         vm.prank(agent);
@@ -362,7 +429,7 @@ contract VaultPolicyTest is Test {
     }
 
     function test_getRateLimitStatus() public {
-        bytes memory cd = abi.encodeWithSignature("getERC20Count()");
+        bytes memory cd = _navUpdateCall();
         vm.startPrank(agent);
         policy.propose(address(ledger), cd, VaultPolicy.AssetCategory.BOND, "t1", 3);
         policy.propose(address(ledger), cd, VaultPolicy.AssetCategory.BOND, "t2", 3);
@@ -373,7 +440,7 @@ contract VaultPolicyTest is Test {
     }
 
     function test_rateLimitResetsAfterWindow() public {
-        bytes memory cd = abi.encodeWithSignature("getERC20Count()");
+        bytes memory cd = _navUpdateCall();
         vm.startPrank(agent);
         for (uint256 i = 0; i < MAX_TX; i++) {
             policy.propose(address(ledger), cd, VaultPolicy.AssetCategory.BOND, "t", 3);

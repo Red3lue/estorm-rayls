@@ -83,6 +83,14 @@ contract VaultPolicy {
     bytes4 internal constant SEL_CERTIFY =
         bytes4(keccak256("certify(uint256,uint8,string)"));
 
+    // ─── Selector Allowlist ──────────────────────────────────────────────────
+
+    /// @dev Only whitelisted selectors can be proposed or executed.
+    ///      The agent cannot call arbitrary functions — even on contracts owned by this policy.
+    mapping(bytes4 => bool) public allowedSelectors;
+
+    event SelectorAllowed(bytes4 indexed selector, bool allowed);
+
     // ─── Proposal Lifecycle ──────────────────────────────────────────────────
 
     enum ProposalStatus { PENDING, AUTO_EXECUTED, APPROVED, DISMISSED, WITHDRAWN }
@@ -155,6 +163,18 @@ contract VaultPolicy {
         categoryPermissions[AssetCategory.ISSUANCE]   = true;
         categoryPermissions[AssetCategory.ART]        = false; // human-only by default
 
+        // Whitelist the exact vault operations the agent is allowed to propose.
+        // Any other selector is rejected at propose() time.
+        allowedSelectors[SEL_ADD_ERC20]       = true;
+        allowedSelectors[SEL_UPDATE_PORTFOLIO] = true;
+        allowedSelectors[SEL_SWAP]             = true;
+        allowedSelectors[SEL_UPDATE_ERC721]    = true;
+        allowedSelectors[SEL_CERTIFY]          = true;
+        // VaultLedger.addERC721Asset(address,uint256,string,uint256,uint8)
+        allowedSelectors[bytes4(keccak256("addERC721Asset(address,uint256,string,uint256,uint8)"))] = true;
+        // VaultLedger.recordTrade(uint8,string,uint256,uint8,bool)
+        allowedSelectors[bytes4(keccak256("recordTrade(uint8,string,uint256,uint8,bool)"))]         = true;
+
         _proposals.push(Proposal({
             id: 0, target: address(0), callData: "", category: AssetCategory.BOND,
             valueUSD: 0, reasoning: "", quorumVotes: 0,
@@ -183,6 +203,8 @@ contract VaultPolicy {
         uint8           quorumVotes
     ) external onlyAgent notPaused returns (uint256 id) {
         require(target != address(0), "zero target");
+        require(callData.length >= 4, "calldata too short");
+        require(allowedSelectors[bytes4(callData[:4])], "selector not allowed");
 
         // Derive the true value from calldata — not from agent input
         uint256 derivedValue = _extractValue(callData, target);
@@ -266,6 +288,13 @@ contract VaultPolicy {
         settings.maxTxPerWindow = _maxTxPerWindow;
         settings.windowDuration = _windowDuration;
         emit SettingsUpdated(settings.valueThreshold, _maxTxPerWindow, _windowDuration);
+    }
+
+    /// @notice Add or remove a function selector from the execution allowlist.
+    ///         Only whitelisted selectors can be proposed or executed by the agent.
+    function setAllowedSelector(bytes4 selector, bool allowed) external onlyManager {
+        allowedSelectors[selector] = allowed;
+        emit SelectorAllowed(selector, allowed);
     }
 
     function setCategoryPermission(AssetCategory category, bool aiManaged) external onlyManager {
@@ -428,6 +457,13 @@ contract VaultPolicy {
     }
 
     function _execute(uint256 proposalId, address target, bytes memory callData) internal {
+        // Defense-in-depth: re-check selector even if it was validated at propose time.
+        // Guards against a selector being de-whitelisted after a proposal was queued.
+        require(callData.length >= 4, "calldata too short");
+        bytes4 sel;
+        assembly { sel := mload(add(callData, 32)) }
+        require(allowedSelectors[sel], "selector not allowed");
+
         (bool success, bytes memory returnData) = target.call(callData);
         if (!success) {
             emit ExecutionFailed(proposalId, returnData);
