@@ -10,9 +10,6 @@ env:
 
 jobs:
   check:
-    strategy:
-      fail-fast: true
-
     name: Foundry project
     runs-on: ubuntu-latest
     steps:
@@ -30,14 +27,17 @@ jobs:
       - name: Run Forge fmt
         run: |
           forge fmt --check
+        working-directory: packages/contracts
         id: fmt
 
       - name: Run Forge build
         run: |
           forge build --sizes
+        working-directory: packages/contracts
         id: build
 
       - name: Run Forge tests
         run: |
           forge test -vvv
+        working-directory: packages/contracts
         id: test
