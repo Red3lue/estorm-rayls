@@ -8,9 +8,9 @@
     "test:verbose": "forge test -vvv",
     "fmt": "forge fmt",
     "fmt:check": "forge fmt --check",
-    "deploy:private": "forge script script/Deploy.s.sol --rpc-url $PRIVACY_NODE_RPC_URL --broadcast --legacy",
-    "deploy:public": "forge script script/DeployPublic.s.sol --rpc-url $PUBLIC_CHAIN_RPC_URL --broadcast --legacy",
-    "balance": "forge script script/CheckBalance.s.sol --rpc-url $PRIVACY_NODE_RPC_URL"
+    "deploy:private": "forge script script/Deploy.s.sol --rpc-url privacy_node --broadcast --legacy",
+    "deploy:public": "forge script script/DeployPublic.s.sol --rpc-url public_chain --broadcast --legacy",
+    "balance": "forge script script/CheckBalance.s.sol --rpc-url privacy_node"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^5.4.0",
