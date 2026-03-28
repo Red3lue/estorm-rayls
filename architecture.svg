@@ -1,0 +1,258 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" font-family="'Segoe UI', system-ui, -apple-system, sans-serif">
+  <defs>
+    <linearGradient id="privacyGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#16213e;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="subnetGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#0f3460;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1a1a5e;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="publicGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#533483;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#6a0572;stop-opacity:1" />
+    </linearGradient>
+    <linearGradient id="agentGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#e94560;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#c62a88;stop-opacity:1" />
+    </linearGradient>
+    <filter id="shadow" x="-5%" y="-5%" width="110%" height="110%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="#000" flood-opacity="0.3"/>
+    </filter>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+    <marker id="arrowBlue" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0,0 8,3 0,6" fill="#4fc3f7"/>
+    </marker>
+    <marker id="arrowPurple" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0,0 8,3 0,6" fill="#ce93d8"/>
+    </marker>
+    <marker id="arrowTeal" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto">
+      <polygon points="0,0 8,3 0,6" fill="#5588bb"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1200" height="900" rx="16" fill="#0a0a1a"/>
+
+  <!-- Title -->
+  <text x="600" y="38" text-anchor="middle" fill="#ffffff" font-size="22" font-weight="700">eStorm — AI-Managed Tokenized Fund</text>
+  <text x="600" y="58" text-anchor="middle" fill="#888" font-size="13">Autonomous Treasury Agent on Rayls</text>
+
+  <!-- ============================================================ -->
+  <!-- PRIVATE NETWORK (Subnet) outer box -->
+  <!-- ============================================================ -->
+  <rect x="30" y="78" width="720" height="470" rx="12" fill="none" stroke="#0f3460" stroke-width="2" stroke-dasharray="8,4" opacity="0.7"/>
+  <text x="50" y="100" fill="#4a8fe7" font-size="13" font-weight="600" letter-spacing="1">PRIVATE NETWORK (Subnet)</text>
+
+  <!-- ======================== -->
+  <!-- Privacy Node 1 (our node) -->
+  <!-- ======================== -->
+  <rect x="50" y="112" width="320" height="310" rx="10" fill="url(#privacyGrad)" filter="url(#shadow)"/>
+  <text x="210" y="138" text-anchor="middle" fill="#4fc3f7" font-size="14" font-weight="700">Privacy Node 1 (Our Node)</text>
+  <text x="210" y="154" text-anchor="middle" fill="#666" font-size="10">Chain ID: 800001 | Gasless</text>
+
+  <!-- RWA Tokens box -->
+  <rect x="68" y="166" width="284" height="130" rx="6" fill="#111133" stroke="#333366" stroke-width="1"/>
+  <text x="210" y="184" text-anchor="middle" fill="#aaa" font-size="11" font-weight="600">RWA PORTFOLIO (ERC-20 Tokens)</text>
+
+  <rect x="78" y="194" width="128" height="26" rx="4" fill="#1b3a1b" stroke="#2d6a2d" stroke-width="1"/>
+  <text x="142" y="212" text-anchor="middle" fill="#6bcf6b" font-size="10" font-weight="600">BOND-GOV-6M</text>
+
+  <rect x="214" y="194" width="128" height="26" rx="4" fill="#3a2a1b" stroke="#6a4a2d" stroke-width="1"/>
+  <text x="278" y="212" text-anchor="middle" fill="#cfa86b" font-size="10" font-weight="600">RECV-ACME-90D</text>
+
+  <rect x="78" y="226" width="128" height="26" rx="4" fill="#3a2a1b" stroke="#6a4a2d" stroke-width="1"/>
+  <text x="142" y="244" text-anchor="middle" fill="#cfa86b" font-size="10" font-weight="600">RECV-BETA-30D</text>
+
+  <rect x="214" y="226" width="128" height="26" rx="4" fill="#1b2a3a" stroke="#2d4a6a" stroke-width="1"/>
+  <text x="278" y="244" text-anchor="middle" fill="#6ba8cf" font-size="10" font-weight="600">STABLE-USDr</text>
+
+  <rect x="146" y="258" width="128" height="26" rx="4" fill="#3a1b2a" stroke="#6a2d4a" stroke-width="1"/>
+  <text x="210" y="276" text-anchor="middle" fill="#cf6ba8" font-size="10" font-weight="600">FUND-DEFI-IDX</text>
+
+  <!-- TreasuryLedger -->
+  <rect x="68" y="306" width="136" height="44" rx="6" fill="#111133" stroke="#333366" stroke-width="1"/>
+  <text x="136" y="326" text-anchor="middle" fill="#7986cb" font-size="10" font-weight="600">TreasuryLedger.sol</text>
+  <text x="136" y="340" text-anchor="middle" fill="#666" font-size="9">NAV, allocations, history</text>
+
+  <!-- DvP Exchange -->
+  <rect x="216" y="306" width="136" height="44" rx="6" fill="#111133" stroke="#333366" stroke-width="1"/>
+  <text x="284" y="326" text-anchor="middle" fill="#7986cb" font-size="10" font-weight="600">DvP Exchange</text>
+  <text x="284" y="340" text-anchor="middle" fill="#666" font-size="9">Atomic swaps</text>
+
+  <!-- Privacy Label -->
+  <rect x="68" y="362" width="284" height="24" rx="4" fill="#1a0a0a" stroke="#4a2222" stroke-width="1"/>
+  <text x="210" y="378" text-anchor="middle" fill="#e57373" font-size="10" font-weight="600">PRIVATE — Only AI Agent can read/write</text>
+
+  <!-- ======================== -->
+  <!-- Privacy Node N -->
+  <!-- ======================== -->
+  <rect x="400" y="112" width="330" height="150" rx="10" fill="url(#privacyGrad)" filter="url(#shadow)" opacity="0.6"/>
+  <text x="565" y="138" text-anchor="middle" fill="#4fc3f7" font-size="14" font-weight="700" opacity="0.8">Privacy Node N</text>
+  <text x="565" y="154" text-anchor="middle" fill="#666" font-size="10">Counterparties in the network</text>
+
+  <rect x="420" y="168" width="290" height="40" rx="6" fill="#111133" stroke="#333366" stroke-width="1" opacity="0.6"/>
+  <text x="565" y="186" text-anchor="middle" fill="#aaa" font-size="10" opacity="0.7">Their RWA tokens</text>
+  <text x="565" y="200" text-anchor="middle" fill="#666" font-size="9" opacity="0.7">Available for DvP swaps via Subnet Hub</text>
+
+  <rect x="420" y="218" width="290" height="24" rx="4" fill="#1a0a0a" stroke="#4a2222" stroke-width="1" opacity="0.6"/>
+  <text x="565" y="234" text-anchor="middle" fill="#e57373" font-size="10" opacity="0.7">PRIVATE — Their sovereign data</text>
+
+  <!-- ======================== -->
+  <!-- Subnet Hub -->
+  <!-- ======================== -->
+  <rect x="400" y="290" width="330" height="120" rx="10" fill="url(#subnetGrad)" filter="url(#shadow)"/>
+  <text x="565" y="316" text-anchor="middle" fill="#64b5f6" font-size="14" font-weight="700">Subnet Hub (Commit Chain)</text>
+  <text x="565" y="332" text-anchor="middle" fill="#666" font-size="10">Managed by Rayls</text>
+
+  <text x="430" y="354" fill="#8899aa" font-size="10">Token Registry</text>
+  <text x="430" y="370" fill="#8899aa" font-size="10">Member Registry</text>
+  <text x="430" y="386" fill="#8899aa" font-size="10">ZK Proof Validation</text>
+  <text x="590" y="354" fill="#8899aa" font-size="10">Governance</text>
+  <text x="590" y="370" fill="#8899aa" font-size="10">DvP Settlement</text>
+  <text x="590" y="386" fill="#8899aa" font-size="10">State Commits</text>
+
+  <!-- Backend API -->
+  <rect x="400" y="425" width="330" height="35" rx="6" fill="#0d1f3c" stroke="#1a3a6a" stroke-width="1"/>
+  <text x="565" y="448" text-anchor="middle" fill="#5588bb" font-size="10" font-weight="600">Backend API — Onboarding, Token Registration, Approval</text>
+
+  <!-- ======================== -->
+  <!-- Relayer arrows -->
+  <!-- ======================== -->
+  <!-- Privacy Node 1 → Hub -->
+  <line x1="370" y1="340" x2="400" y2="340" stroke="#4fc3f7" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrowBlue)"/>
+  <text x="375" y="333" fill="#4fc3f7" font-size="9" font-weight="600">Relayer</text>
+
+  <!-- Privacy Node N → Hub -->
+  <line x1="565" y1="262" x2="565" y2="290" stroke="#4fc3f7" stroke-width="1.5" stroke-dasharray="5,3" marker-end="url(#arrowBlue)"/>
+  <text x="575" y="280" fill="#4fc3f7" font-size="9" font-weight="600">Relayer</text>
+
+  <!-- ============================================================ -->
+  <!-- Teleport arrow (Subnet → Public) -->
+  <!-- ============================================================ -->
+  <line x1="565" y1="470" x2="565" y2="570" stroke="#ce93d8" stroke-width="2.5" filter="url(#glow)" marker-end="url(#arrowPurple)"/>
+  <rect x="515" y="510" width="100" height="22" rx="4" fill="#2a1040"/>
+  <text x="565" y="525" text-anchor="middle" fill="#ce93d8" font-size="11" font-weight="700">TELEPORT</text>
+
+  <!-- ============================================================ -->
+  <!-- PUBLIC CHAIN -->
+  <!-- ============================================================ -->
+  <rect x="30" y="580" width="720" height="200" rx="12" fill="url(#publicGrad)" filter="url(#shadow)"/>
+  <text x="390" y="606" text-anchor="middle" fill="#e1bee7" font-size="14" font-weight="700">Rayls Public Chain (L1)</text>
+  <text x="390" y="622" text-anchor="middle" fill="#9575cd" font-size="10">Chain ID: 7295799 | Gas: USDr | Permissionless</text>
+
+  <!-- Attestation.sol -->
+  <rect x="50" y="638" width="210" height="65" rx="8" fill="#2a1045" stroke="#7c4dff" stroke-width="1.5"/>
+  <text x="155" y="660" text-anchor="middle" fill="#b388ff" font-size="12" font-weight="700">Attestation.sol</text>
+  <text x="155" y="676" text-anchor="middle" fill="#9575cd" font-size="9">NAV, risk score, AI reasoning</text>
+  <text x="155" y="690" text-anchor="middle" fill="#9575cd" font-size="9">Public, verifiable by anyone</text>
+
+  <!-- FundShareToken.sol -->
+  <rect x="280" y="638" width="210" height="65" rx="8" fill="#2a1045" stroke="#7c4dff" stroke-width="1.5"/>
+  <text x="385" y="660" text-anchor="middle" fill="#b388ff" font-size="12" font-weight="700">FundShareToken.sol</text>
+  <text x="385" y="676" text-anchor="middle" fill="#9575cd" font-size="9">ERC-20 fund shares</text>
+  <text x="385" y="690" text-anchor="middle" fill="#9575cd" font-size="9">Price = NAV / total shares</text>
+
+  <!-- Marketplace.sol -->
+  <rect x="510" y="638" width="210" height="65" rx="8" fill="#2a1045" stroke="#7c4dff" stroke-width="1.5"/>
+  <text x="615" y="660" text-anchor="middle" fill="#b388ff" font-size="12" font-weight="700">Marketplace.sol</text>
+  <text x="615" y="676" text-anchor="middle" fill="#9575cd" font-size="9">Fund shares listed here</text>
+  <text x="615" y="690" text-anchor="middle" fill="#9575cd" font-size="9">Investors buy in</text>
+
+  <!-- Public disclosure label -->
+  <rect x="50" y="716" width="670" height="24" rx="4" fill="#1a0a2a" stroke="#6a2d6a" stroke-width="1"/>
+  <text x="385" y="732" text-anchor="middle" fill="#ce93d8" font-size="10" font-weight="600">PUBLIC — Investors see attestations + fund shares, NEVER underlying positions</text>
+
+  <!-- Investor info -->
+  <text x="390" y="762" text-anchor="middle" fill="#666" font-size="10">Investors see: NAV, Risk Score, Yield, AI Reasoning, Share Price</text>
+  <text x="390" y="778" text-anchor="middle" fill="#555" font-size="10">Never see: Holdings, Amounts, Counterparties, Strategy</text>
+
+  <!-- ============================================================ -->
+  <!-- AI AGENT -->
+  <!-- ============================================================ -->
+  <rect x="790" y="78" width="380" height="500" rx="12" fill="url(#agentGrad)" filter="url(#shadow)"/>
+  <text x="980" y="108" text-anchor="middle" fill="#ffffff" font-size="16" font-weight="700">AI Treasury Agent</text>
+  <text x="980" y="126" text-anchor="middle" fill="#ffcdd2" font-size="11">TypeScript / Node.js / ethers.js</text>
+
+  <!-- OBSERVE -->
+  <rect x="810" y="144" width="340" height="55" rx="6" fill="#3a1525" stroke="#e57373" stroke-width="1"/>
+  <text x="830" y="164" fill="#ef9a9a" font-size="12" font-weight="700">1. OBSERVE</text>
+  <text x="830" y="180" fill="#cc8888" font-size="9">Read balances (Privacy Node RPC), calculate NAV</text>
+  <text x="830" y="192" fill="#cc8888" font-size="9">Build portfolio snapshot with allocations</text>
+
+  <!-- THINK -->
+  <rect x="810" y="208" width="340" height="55" rx="6" fill="#3a1525" stroke="#e57373" stroke-width="1"/>
+  <text x="830" y="228" fill="#ef9a9a" font-size="12" font-weight="700">2. THINK</text>
+  <text x="830" y="244" fill="#cc8888" font-size="9">Claude API (hackathon) / Local LLM (production)</text>
+  <text x="830" y="256" fill="#cc8888" font-size="9">Risk, yield, liquidity, disclosure decisions</text>
+
+  <!-- ATTEST -->
+  <rect x="810" y="272" width="340" height="55" rx="6" fill="#3a1525" stroke="#e57373" stroke-width="1"/>
+  <text x="830" y="292" fill="#ef9a9a" font-size="12" font-weight="700">3. ATTEST</text>
+  <text x="830" y="308" fill="#cc8888" font-size="9">Write to Attestation.sol on Public Chain</text>
+  <text x="830" y="320" fill="#cc8888" font-size="9">NAV, risk score, reasoning — verifiable</text>
+
+  <!-- EXECUTE -->
+  <rect x="810" y="336" width="340" height="55" rx="6" fill="#3a1525" stroke="#e57373" stroke-width="1"/>
+  <text x="830" y="356" fill="#ef9a9a" font-size="12" font-weight="700">4. EXECUTE</text>
+  <text x="830" y="372" fill="#cc8888" font-size="9">DvP swaps + mint/burn on Privacy Node</text>
+  <text x="830" y="384" fill="#cc8888" font-size="9">All trades are PRIVATE</text>
+
+  <!-- ISSUE -->
+  <rect x="810" y="400" width="340" height="55" rx="6" fill="#3a1525" stroke="#e57373" stroke-width="1"/>
+  <text x="830" y="420" fill="#ef9a9a" font-size="12" font-weight="700">5. ISSUE</text>
+  <text x="830" y="436" fill="#cc8888" font-size="9">Update fund share price on Public Chain</text>
+  <text x="830" y="448" fill="#cc8888" font-size="9">List/delist on Marketplace</text>
+
+  <!-- LLM Adapter -->
+  <rect x="810" y="468" width="340" height="36" rx="6" fill="#2a0a15" stroke="#aa4455" stroke-width="1"/>
+  <text x="980" y="486" text-anchor="middle" fill="#ef9a9a" font-size="10" font-weight="600">LLM Adapter: Claude API (hack) | Local LLM (prod)</text>
+  <text x="980" y="498" text-anchor="middle" fill="#aa6666" font-size="9">LLM-agnostic — swap without code changes</text>
+
+  <!-- Chain Clients -->
+  <rect x="810" y="512" width="340" height="30" rx="6" fill="#2a0a15" stroke="#aa4455" stroke-width="1"/>
+  <text x="980" y="532" text-anchor="middle" fill="#ef9a9a" font-size="10" font-weight="600">Clients: Privacy Node RPC | Public Chain RPC | Backend API</text>
+
+  <!-- ============================================================ -->
+  <!-- Connection arrows from Agent to chains -->
+  <!-- ============================================================ -->
+
+  <!-- Agent OBSERVE → Privacy Node (routed above Privacy Node N) -->
+  <path d="M 810 168 L 775 168 L 775 105 L 360 105 L 360 168" fill="none" stroke="#4fc3f7" stroke-width="1.5" stroke-dasharray="6,3" marker-end="url(#arrowBlue)"/>
+  <text x="570" y="99" fill="#4fc3f7" font-size="9" font-weight="600">read balances (Privacy Node RPC)</text>
+
+  <!-- Agent EXECUTE → Privacy Node (routed below Subnet Hub) -->
+  <path d="M 810 360 L 775 360 L 775 475 L 360 475 L 360 378" fill="none" stroke="#4fc3f7" stroke-width="1.5" stroke-dasharray="6,3" marker-end="url(#arrowBlue)"/>
+  <text x="480" y="490" fill="#4fc3f7" font-size="9" font-weight="600">DvP swaps, mint/burn (private)</text>
+
+  <!-- Agent → Backend API -->
+  <line x1="810" y1="440" x2="730" y2="440" stroke="#5588bb" stroke-width="1.5" stroke-dasharray="6,3" marker-end="url(#arrowTeal)"/>
+  <text x="760" y="432" fill="#5588bb" font-size="9" font-weight="600">register</text>
+
+  <!-- Agent ATTEST+ISSUE → Public Chain (goes down then left) -->
+  <path d="M 980 555 L 980 660 L 720 660" fill="none" stroke="#ce93d8" stroke-width="1.5" stroke-dasharray="6,3" marker-end="url(#arrowPurple)"/>
+  <text x="860" y="650" fill="#ce93d8" font-size="9" font-weight="600">attest + issue shares (RPC)</text>
+
+  <!-- ============================================================ -->
+  <!-- Revenue Model box -->
+  <!-- ============================================================ -->
+  <rect x="790" y="600" width="380" height="190" rx="12" fill="#1a1a2e" stroke="#444" stroke-width="1" filter="url(#shadow)"/>
+  <text x="980" y="628" text-anchor="middle" fill="#ffffff" font-size="14" font-weight="700">Revenue Model</text>
+
+  <rect x="810" y="642" width="340" height="40" rx="6" fill="#1b3a1b" stroke="#2d6a2d" stroke-width="1"/>
+  <text x="980" y="660" text-anchor="middle" fill="#81c784" font-size="11" font-weight="600">Management Fee: 2% AUM / year</text>
+  <text x="980" y="676" text-anchor="middle" fill="#66996a" font-size="9">Automated, deducted from NAV on-chain</text>
+
+  <rect x="810" y="692" width="340" height="40" rx="6" fill="#1b3a1b" stroke="#2d6a2d" stroke-width="1"/>
+  <text x="980" y="710" text-anchor="middle" fill="#81c784" font-size="11" font-weight="600">Performance Fee: 20% above 5% hurdle</text>
+  <text x="980" y="726" text-anchor="middle" fill="#66996a" font-size="9">AI-calculated, collected on-chain</text>
+
+  <text x="980" y="756" text-anchor="middle" fill="#888" font-size="11">$1M AUM = $20K + $4.6K / year</text>
+  <text x="980" y="775" text-anchor="middle" fill="#666" font-size="10">Same model as BlackRock, fully automated</text>
+</svg>
