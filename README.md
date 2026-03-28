@@ -39,7 +39,7 @@ Every cycle, the AI agent:
 | **Privacy Node** | 5 RWA tokens, TreasuryLedger.sol, DvP swaps | Private — only the AI agent sees this |
 | **Subnet Hub** | Token Registry, governance, DvP settlement | Managed by Rayls — we register tokens here |
 | **Public Chain** | Attestation.sol, FundShareToken.sol, Marketplace.sol | Public — investors and anyone can verify |
-| **Off-chain** | AI Agent (TypeScript + Claude API) | Runs alongside Privacy Node in production |
+| **Off-chain** | AI Agent (TypeScript + Claude Code CLI) | Runs alongside Privacy Node in production |
 
 ### The Disclosure Design
 
@@ -61,7 +61,7 @@ Investors never see:
 |-----------|-----------|
 | Smart Contracts | Solidity 0.8.24, Foundry, `@rayls/contracts` SDK |
 | AI Agent | TypeScript, Node.js, ethers.js v6 |
-| LLM | Claude API (hackathon) / Local LLM (production) |
+| LLM | Claude Code CLI, local subscription (hackathon) / Local LLM (production) |
 | Frontend | React (lightweight dashboard) |
 | Chains | Privacy Node (800001), Public Chain (7295799) |
 
@@ -86,7 +86,7 @@ estorm-rayls/
 │   │   └── issue.ts        # Fund share management
 │   ├── adapters/
 │   │   ├── llm.ts          # LLM adapter interface
-│   │   └── claude.ts       # Claude API implementation
+│   │   └── claude-code.ts   # Claude Code CLI implementation
 │   ├── clients/
 │   │   ├── privacy-node.ts # Privacy Node RPC client
 │   │   ├── public-chain.ts # Public Chain RPC client
