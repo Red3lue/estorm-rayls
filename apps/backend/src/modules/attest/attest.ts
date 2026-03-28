@@ -1,6 +1,6 @@
 import { ethers } from "ethers";
 import { config } from "../../config/index.js";
-import { getPublicChainWallet } from "../../clients/publicChain.js";
+import { getAttestationWriterWallet } from "../../clients/publicChain.js";
 import { ATTESTATION_ABI } from "../../abis/index.js";
 import type { VaultSnapshot } from "../../types/vault.js";
 import type { QuorumResult } from "../../types/think.js";
@@ -38,8 +38,10 @@ async function submitAttestation(
  * ATTEST MODULE — Protocol-owned trust layer.
  *
  * Reads quorum-approved actions and writes attestations to the institution's
- * Attestation.sol on the Public Chain. This module is non-customizable —
- * institutions control what Attestation.sol discloses, but the writer logic is protocol-owned.
+ * Attestation.sol on the Public Chain. This module is NON-CUSTOMIZABLE —
+ * institutions provide their own Attestation.sol schema, but the writer logic
+ * is protocol-owned. The writer wallet is the immutable owner of the contract
+ * (onlyOwner on attest(), transferOwnership() reverts).
  */
 export async function attest(
   quorum: QuorumResult,
@@ -53,7 +55,7 @@ export async function attest(
     return [];
   }
 
-  const wallet = getPublicChainWallet();
+  const wallet = getAttestationWriterWallet();
   console.log(`[ATTEST] Writer: ${wallet.address}`);
   console.log(`[ATTEST] Attestation contract: ${config.contracts.attestation}`);
 

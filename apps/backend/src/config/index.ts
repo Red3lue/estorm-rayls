@@ -22,7 +22,9 @@ export const config = {
   keys: {
     deployer: required("DEPLOYER_PRIVATE_KEY"),
     registered: optional("REGISTERED_PRIVATE_KEY", ""),
-    publicDeployer: optional("PUBLIC_DEPLOYER_KEY", ""),
+    /** Protocol attestation writer — owns Attestation.sol (immutable, onlyOwner).
+     *  Falls back to PUBLIC_DEPLOYER_KEY for hackathon (same wallet deploys and writes). */
+    attestationWriter: optional("ATTESTATION_WRITER_KEY", "") || optional("PUBLIC_DEPLOYER_KEY", ""),
   },
   contracts: {
     bondGov: optional("BOND_GOV_ADDRESS", ""),

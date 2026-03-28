@@ -14,12 +14,17 @@ export function getPublicChainProvider(): ethers.JsonRpcProvider {
   return provider;
 }
 
-export function getPublicChainWallet(): ethers.Wallet {
+/**
+ * Returns the attestation writer wallet — the protocol agent that owns
+ * Attestation.sol (immutable ownership, onlyOwner on attest()).
+ * This is the ONLY wallet that can call attest() on the institution's contract.
+ */
+export function getAttestationWriterWallet(): ethers.Wallet {
   if (!wallet) {
-    if (!config.keys.publicDeployer) {
-      throw new Error("PUBLIC_DEPLOYER_KEY is required for Public Chain transactions");
+    if (!config.keys.attestationWriter) {
+      throw new Error("ATTESTATION_WRITER_KEY (or PUBLIC_DEPLOYER_KEY) is required for attestation writes");
     }
-    wallet = new ethers.Wallet(config.keys.publicDeployer, getPublicChainProvider());
+    wallet = new ethers.Wallet(config.keys.attestationWriter, getPublicChainProvider());
   }
   return wallet;
 }
