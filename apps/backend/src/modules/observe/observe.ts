@@ -63,8 +63,25 @@ async function readVaultLedger(provider: ethers.JsonRpcProvider): Promise<{ erc2
   try {
     const ledger = new ethers.Contract(config.contracts.vaultLedger, VAULT_LEDGER_ABI, provider);
     const [erc20s, erc721s] = await ledger.getVaultSnapshot();
-    for (const a of erc20s) erc20Meta.set(a.tokenAddress.toLowerCase(), { allocationPct: Number(a.allocationPct), riskScore: Number(a.riskScore), yieldRate: Number(a.yieldRate) });
-    for (const a of erc721s) erc721Meta.set(`${a.tokenAddress.toLowerCase()}-${a.tokenId}`, { valuation: Number(a.valuation) / 1e18, certificationStatus: mapCertificationStatus(Number(a.certificationStatus)), riskScore: Number(a.riskScore) });
+
+    for (const a of erc20s) {
+      if (!a.active) continue;
+      erc20Meta.set(a.tokenAddress.toLowerCase(), {
+        allocationPct: Number(a.allocationPct),       // uint8 0-100
+        riskScore: Number(a.riskScore),                // uint8 0-100
+        yieldRate: Number(a.yieldBps) / 100,           // bps → percentage (420 → 4.2%)
+      });
+    }
+
+    for (const a of erc721s) {
+      if (!a.active) continue;
+      const key = `${a.tokenAddress.toLowerCase()}-${a.tokenId}`;
+      erc721Meta.set(key, {
+        valuation: Number(a.valuationUSD) / 100,       // cents → dollars
+        certificationStatus: a.certified ? CertificationStatus.CERTIFIED : CertificationStatus.UNCERTIFIED,
+        riskScore: Number(a.riskScore),                // uint8 0-100
+      });
+    }
   } catch (err) {
     console.warn("[observe] VaultLedger read failed, using defaults:", (err as Error).message);
   }

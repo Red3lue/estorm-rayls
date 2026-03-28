@@ -14,9 +14,10 @@ export const ERC721_ABI = [
   "function balanceOf(address) view returns (uint256)",
 ] as const;
 
+/** Matches VaultLedger.sol deployed on feat/2A.3 */
 export const VAULT_LEDGER_ABI = [
-  "function getErc20Assets() view returns (tuple(address tokenAddress, string symbol, uint256 allocationPct, uint256 riskScore, uint256 yieldRate)[])",
-  "function getErc721Assets() view returns (tuple(address tokenAddress, uint256 tokenId, uint256 valuation, uint8 certificationStatus, uint256 riskScore)[])",
   "function getNAV() view returns (uint256)",
-  "function getVaultSnapshot() view returns (tuple(address tokenAddress, string symbol, uint256 allocationPct, uint256 riskScore, uint256 yieldRate)[], tuple(address tokenAddress, uint256 tokenId, uint256 valuation, uint8 certificationStatus, uint256 riskScore)[])",
+  "function getVaultSnapshot() view returns (tuple(address tokenAddress, string symbol, uint256 balance, uint256 valueUSD, uint8 allocationPct, uint8 riskScore, uint256 yieldBps, bool active)[], tuple(address tokenAddress, uint256 tokenId, string symbol, uint256 valuationUSD, bool certified, uint8 certScore, uint8 riskScore, bool active)[])",
+  "function getERC20Count() view returns (uint256)",
+  "function getERC721Count() view returns (uint256)",
 ] as const;
