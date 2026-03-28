@@ -411,12 +411,32 @@ contract VaultPolicyTest is Test {
         assertEq(uint8(h[1].status), uint8(VaultPolicy.ProposalStatus.PENDING));
     }
 
-    function test_setValueThreshold() public {
+    // ── setValueThreshold ─────────────────────────────────────────────────────
+
+    function test_setValueThreshold_updatesSettings() public {
         vm.prank(manager);
         policy.setValueThreshold(1_000_000_00);
         (uint256 vt,,,) = policy.settings();
         assertEq(vt, 1_000_000_00);
     }
+
+    function test_setValueThreshold_onlyManager() public {
+        vm.prank(alice);
+        vm.expectRevert("not manager");
+        policy.setValueThreshold(1_000_000_00);
+    }
+
+    function test_setValueThreshold_takesEffect() public {
+        // Lower threshold so tokenA ($100k) now requires approval
+        vm.prank(manager);
+        policy.setValueThreshold(500_00); // $500
+
+        vm.prank(agent);
+        uint256 id = policy.propose(address(ledger), _addTokenAReal(), VaultPolicy.AssetCategory.BOND, "now pending", 3);
+        assertEq(policy.pendingProposalId(), id); // goes pending instead of auto-exec
+    }
+
+    // ── setCategoryPermission ─────────────────────────────────────────────────
 
     function test_setCategoryPermission_artToAiManaged() public {
         vm.prank(manager);
@@ -427,6 +447,89 @@ contract VaultPolicyTest is Test {
         assertEq(policy.pendingProposalId(), 0);
         assertGt(id, 0);
     }
+
+    function test_setCategoryPermission_onlyManager() public {
+        vm.prank(alice);
+        vm.expectRevert("not manager");
+        policy.setCategoryPermission(VaultPolicy.AssetCategory.BOND, false);
+    }
+
+    // ── setRateLimit ──────────────────────────────────────────────────────────
+
+    function test_setRateLimit_updatesSettings() public {
+        vm.prank(manager);
+        policy.setRateLimit(5, 7200);
+        (, uint256 max, uint256 window,) = policy.settings();
+        assertEq(max,    5);
+        assertEq(window, 7200);
+    }
+
+    function test_setRateLimit_emitsSettingsUpdated() public {
+        vm.prank(manager);
+        vm.expectEmit(false, false, false, true);
+        emit VaultPolicy.SettingsUpdated(THRESHOLD, 5, 7200);
+        policy.setRateLimit(5, 7200);
+    }
+
+    function test_setRateLimit_onlyManager() public {
+        vm.prank(alice);
+        vm.expectRevert("not manager");
+        policy.setRateLimit(5, 7200);
+    }
+
+    function test_setRateLimit_zeroWindow_reverts() public {
+        vm.prank(manager);
+        vm.expectRevert("zero window");
+        policy.setRateLimit(5, 0);
+    }
+
+    function test_setRateLimit_lowerLimit_takesEffect() public {
+        // Execute 3 txs under the original limit of 10
+        bytes memory cd = _navUpdateCall();
+        vm.startPrank(agent);
+        policy.propose(address(ledger), cd, VaultPolicy.AssetCategory.BOND, "t1", 3);
+        policy.propose(address(ledger), cd, VaultPolicy.AssetCategory.BOND, "t2", 3);
+        policy.propose(address(ledger), cd, VaultPolicy.AssetCategory.BOND, "t3", 3);
+        vm.stopPrank();
+
+        // Manager lowers the limit to 3
+        vm.prank(manager);
+        policy.setRateLimit(3, WINDOW);
+
+        // 4th tx should now be blocked (3 >= 3)
+        vm.prank(agent);
+        uint256 id = policy.propose(address(ledger), cd, VaultPolicy.AssetCategory.BOND, "4th blocked", 3);
+        assertEq(policy.pendingProposalId(), id);
+    }
+
+    function test_setRateLimit_higherLimit_unblocks() public {
+        // Hit the original limit of 10
+        bytes memory cd = _navUpdateCall();
+        vm.startPrank(agent);
+        for (uint256 i = 0; i < MAX_TX; i++) {
+            policy.propose(address(ledger), cd, VaultPolicy.AssetCategory.BOND, "t", 3);
+        }
+        vm.stopPrank();
+
+        // Dismiss the pending proposal so the slot is free
+        vm.startPrank(agent);
+        uint256 pending = policy.propose(address(ledger), cd, VaultPolicy.AssetCategory.BOND, "11th", 3);
+        vm.stopPrank();
+        vm.prank(manager);
+        policy.dismiss(pending);
+
+        // Raise the limit to 20
+        vm.prank(manager);
+        policy.setRateLimit(20, WINDOW);
+
+        // Next tx auto-executes again (10 < 20)
+        vm.prank(agent);
+        uint256 id = policy.propose(address(ledger), cd, VaultPolicy.AssetCategory.BOND, "now auto", 3);
+        assertEq(policy.pendingProposalId(), 0);
+        assertGt(id, 0);
+    }
+
+    // ── getRateLimitStatus ────────────────────────────────────────────────────
 
     function test_getRateLimitStatus() public {
         bytes memory cd = _navUpdateCall();
