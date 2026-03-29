@@ -9,6 +9,7 @@ export const CONTRACTS = {
   stableUsdr: "0x7679653255d0128F7553945A917a636C3ed2F7eB",
   picassoNft: "0x24a059519f65659337cDafddc104835C11BCb5ce",
   warholNft: "0xb6ab2e98811bFf69Fc60Fb1Cc83A2E043C096247",
+  attestation: process.env.NEXT_PUBLIC_ATTESTATION_ADDRESS ?? "",
 } as const;
 
 export const BACKEND_API = "http://localhost:3001";

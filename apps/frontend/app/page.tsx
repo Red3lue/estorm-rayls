@@ -10,59 +10,51 @@ export default function ManagerDashboard() {
   const { snapshot, loading, error, refresh } = useVaultSnapshot();
 
   return (
-    <div className="flex min-h-full flex-col">
-      <header className="border-b border-border bg-surface px-6 py-4">
-        <div className="mx-auto flex max-w-6xl items-center justify-between">
-          <div>
-            <h1 className="text-lg font-semibold tracking-tight text-foreground">
-              Sovereign Vault Protocol
-            </h1>
-            <p className="text-xs text-muted">Vault Manager Dashboard</p>
-          </div>
-          <div className="flex items-center gap-3">
-            {snapshot && (
-              <span className="text-xs text-muted tabular-nums">
-                Updated{" "}
-                {new Date(snapshot.timestamp).toLocaleTimeString()}
-              </span>
-            )}
-            <button
-              onClick={refresh}
-              disabled={loading}
-              className="rounded-lg border border-border bg-surface-raised px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-border disabled:opacity-50"
-              aria-label="Refresh vault data"
-            >
-              {loading ? "Loading..." : "Refresh"}
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-6">
-        {error && !snapshot && (
-          <div
-            className="rounded-xl border border-danger/30 bg-danger/5 p-5 text-sm text-danger"
-            role="alert"
+    <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-6">
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-sm font-medium tracking-wide text-muted uppercase">
+          Vault Overview
+        </h2>
+        <div className="flex items-center gap-3">
+          {snapshot && (
+            <span className="text-xs text-muted tabular-nums">
+              Updated {new Date(snapshot.timestamp).toLocaleTimeString()}
+            </span>
+          )}
+          <button
+            onClick={refresh}
+            disabled={loading}
+            className="rounded-lg border border-border bg-surface-raised px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-border disabled:opacity-50"
+            aria-label="Refresh vault data"
           >
-            <p className="font-medium">Failed to load vault data</p>
-            <p className="mt-1 text-danger/80">{error}</p>
-          </div>
-        )}
+            {loading ? "Loading..." : "Refresh"}
+          </button>
+        </div>
+      </div>
 
-        {loading && !snapshot && <SkeletonDashboard />}
+      {error && !snapshot && (
+        <div
+          className="rounded-xl border border-danger/30 bg-danger/5 p-5 text-sm text-danger"
+          role="alert"
+        >
+          <p className="font-medium">Failed to load vault data</p>
+          <p className="mt-1 text-danger/80">{error}</p>
+        </div>
+      )}
 
-        {snapshot && (
-          <div className="flex flex-col gap-6">
-            <NavDisplay snapshot={snapshot} />
-            <div className="grid gap-6 lg:grid-cols-2">
-              <AllocationChart fungibles={snapshot.fungibles} />
-              <NftInventory nonFungibles={snapshot.nonFungibles} />
-            </div>
-            <FungibleTable fungibles={snapshot.fungibles} />
+      {loading && !snapshot && <SkeletonDashboard />}
+
+      {snapshot && (
+        <div className="flex flex-col gap-6">
+          <NavDisplay snapshot={snapshot} />
+          <div className="grid gap-6 lg:grid-cols-2">
+            <AllocationChart fungibles={snapshot.fungibles} />
+            <NftInventory nonFungibles={snapshot.nonFungibles} />
           </div>
-        )}
-      </main>
-    </div>
+          <FungibleTable fungibles={snapshot.fungibles} />
+        </div>
+      )}
+    </main>
   );
 }
 
