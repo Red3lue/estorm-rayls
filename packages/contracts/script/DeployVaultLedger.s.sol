@@ -58,11 +58,11 @@ contract DeployVaultLedger is Script {
         VaultLedger ledger = new VaultLedger(deployerAddr, address(oracle));
 
         // ── 3. Fund VaultLedger with ERC-20 tokens ──────────────────────────
-        // Deployer received initial supply in Phase 2A.1 constructor mints
+        // Use available deployer balances (some tokens already in old VaultLedger/MockDex)
         IERC20Transfer(bondGov).transfer(address(ledger),    350_000 * 1e18);
         IERC20Transfer(recvAcme).transfer(address(ledger),   200_000 * 1e18);
-        IERC20Transfer(recvBeta).transfer(address(ledger),   150_000 * 1e18);
-        IERC20Transfer(stableUsdr).transfer(address(ledger), 200_000 * 1e6);
+        IERC20Transfer(recvBeta).transfer(address(ledger),    50_000 * 1e18);
+        IERC20Transfer(stableUsdr).transfer(address(ledger), 100_000 * 1e6);
 
         // ── 4. Register ERC-20 assets (reads balanceOf + oracle price) ──────
         ledger.addERC20Asset(bondGov,    "BOND-GOV-6M",   15,  420);

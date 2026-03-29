@@ -38,6 +38,7 @@ function isIssueDecision(v: unknown): v is IssueDecision {
 
 /**
  * Parses raw LLM output into a validated AgentDecision.
+ * Accepts both single-action format (actionType + fields) and legacy array format.
  * Returns null if the response is not valid JSON or doesn't match the schema.
  */
 export function parseAgentResponse(raw: string, agentId: string, perspective: AgentDecision["perspective"]): AgentDecision | null {
@@ -48,12 +49,43 @@ export function parseAgentResponse(raw: string, agentId: string, perspective: Ag
 
     if (!isObject(parsed)) return null;
 
-    const rebalance = Array.isArray(parsed.rebalance) ? parsed.rebalance.filter(isRebalanceAction) : [];
-    const certify = Array.isArray(parsed.certify) ? parsed.certify.filter(isCertifyDecision) : [];
-    const issue = Array.isArray(parsed.issue) ? parsed.issue.filter(isIssueDecision) : [];
     const reasoning = typeof parsed.reasoning === "string" ? parsed.reasoning : "";
 
-    return { agentId, perspective, rebalance, certify, issue, reasoning };
+    // Single-action format: { actionType, rebalance: obj|null, certify: obj|null, issue: obj|null }
+    if (typeof parsed.actionType === "string") {
+      const rebalance: RebalanceAction[] = [];
+      const certify: CertifyDecision[] = [];
+      const issue: IssueDecision[] = [];
+
+      if (parsed.actionType === "rebalance" && isRebalanceAction(parsed.rebalance)) {
+        rebalance.push(parsed.rebalance);
+      } else if (parsed.actionType === "certify" && isCertifyDecision(parsed.certify)) {
+        certify.push(parsed.certify);
+      } else if (parsed.actionType === "issue" && isIssueDecision(parsed.issue)) {
+        issue.push(parsed.issue);
+      }
+      // actionType === "none" → all empty arrays
+
+      return { agentId, perspective, rebalance, certify, issue, reasoning };
+    }
+
+    // Legacy array format fallback — take only the first valid action across all categories
+    const rebalanceAll = Array.isArray(parsed.rebalance) ? parsed.rebalance.filter(isRebalanceAction) : [];
+    const certifyAll = Array.isArray(parsed.certify) ? parsed.certify.filter(isCertifyDecision) : [];
+    const issueAll = Array.isArray(parsed.issue) ? parsed.issue.filter(isIssueDecision) : [];
+
+    // Pick only the first action found (priority: rebalance > certify > issue)
+    if (rebalanceAll.length > 0) {
+      return { agentId, perspective, rebalance: [rebalanceAll[0]], certify: [], issue: [], reasoning };
+    }
+    if (certifyAll.length > 0) {
+      return { agentId, perspective, rebalance: [], certify: [certifyAll[0]], issue: [], reasoning };
+    }
+    if (issueAll.length > 0) {
+      return { agentId, perspective, rebalance: [], certify: [], issue: [issueAll[0]], reasoning };
+    }
+
+    return { agentId, perspective, rebalance: [], certify: [], issue: [], reasoning };
   } catch {
     return null;
   }

@@ -3,14 +3,14 @@ export const PUBLIC_CHAIN_RPC = "https://testnet-rpc.rayls.com/";
 
 export const CONTRACTS = {
   // Privacy Node (Chain 800001)
-  vaultLedger: "0x9a48eA8DD2E2e66a444cbb60A128104FFd673A51",
+  vaultLedger: "0xFD31f95A3EC059d462d34499f07488e06c77d3bf",
   bondGov: "0x916E1AF7B6be4Dc5DaD63976e21ce70aaC825B0E",
   recvAcme: "0x23bA554Ea54a08723AA901C590b29bFBe0da7748",
   recvBeta: "0xa8D0dD3e0FFF072374CcbD608fEf4B6Bb71543C2",
   stableUsdr: "0x7679653255d0128F7553945A917a636C3ed2F7eB",
   picassoNft: "0x24a059519f65659337cDafddc104835C11BCb5ce",
   warholNft: "0xb6ab2e98811bFf69Fc60Fb1Cc83A2E043C096247",
-  vaultPolicy: "0x68E9c7Af06CA370241d9567cb16adeB1032d1143",
+  vaultPolicy: "0x023820d5fb4ECe1fAdeD6f90Fd35CF86A6091277",
   // Public Chain (Chain 7295799)
   attestation: "0xc986c24aB18C208883623569f9e2F20179e21CBc",
   vaultShareToken: "0x51155638257ba10d7FC7E6Fba1df1d7315F19a1E",

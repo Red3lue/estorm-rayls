@@ -1,0 +1,22 @@
+# New Deployment (2026-03-29) — VaultLedger with PriceOracle
+# These contracts have oracle support and working swap execution.
+# Swap to these when ready:
+
+PRICE_ORACLE_ADDRESS=0x4F898D5769B211a6eE5f572183597ac7FBEc6580
+VAULT_LEDGER_ADDRESS=0xFD31f95A3EC059d462d34499f07488e06c77d3bf
+VAULT_POLICY_ADDRESS=0x023820d5fb4ECe1fAdeD6f90Fd35CF86A6091277
+
+# Roles:
+#   Agent:   0x099d38515c68FE3ca01a1c75324CD71AC14E814C (PROTOCOL_OWNER_PRIVATE_KEY)
+#   Manager: 0xb5F4c8Af8723e4cAa64767DD12F55B40Be527BE1 (DEPLOYER_PRIVATE_KEY)
+
+# Token balances in new VaultLedger:
+#   BOND-GOV-6M:    350,000 tokens ($35M)
+#   RECV-ACME-90D:  200,000 tokens ($10M)
+#   RECV-BETA-30D:   50,000 tokens ($2.5M)
+#   STABLE-USDr:    100,000 tokens ($100k)
+#   NAV: $47,510,000
+
+# NFTs registered:
+#   ART-PICASSO-01 (ID 1): $500k valuation
+#   ART-WARHOL-01  (ID 1): $250k valuation

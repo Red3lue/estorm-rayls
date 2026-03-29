@@ -13,10 +13,9 @@ contract DeployVaultPolicy is Script {
 
         address vaultLedger  = vm.envAddress("VAULT_LEDGER_ADDRESS");
 
-        // Manager and agent are both the deployer wallet for the hackathon.
-        // In production: manager = multisig, agent = AI wallet.
+        // Manager = deployer, Agent = protocol owner (AI wallet)
         address manager = deployerAddr;
-        address agent   = deployerAddr;
+        address agent   = vm.addr(vm.envUint("PROTOCOL_OWNER_PRIVATE_KEY"));
 
         // Governance parameters
         uint256 valueThreshold = 5_000_000_00; // $50,000 in cents

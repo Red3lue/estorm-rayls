@@ -1,16 +1,36 @@
 import type { VaultSnapshot } from "../../types/vault.js";
 import type {
-  IStrategy, ILLMAdapter, AgentPerspective, AgentIdentity,
-  AgentDecision, ThinkResult,
+  IStrategy,
+  ILLMAdapter,
+  AgentPerspective,
+  AgentIdentity,
+  AgentDecision,
+  ThinkResult,
 } from "../../types/think.js";
 import { parseAgentResponse } from "./validation.js";
 import { computeQuorum } from "./quorum.js";
 
 const AGENT_PERSPECTIVES: AgentIdentity[] = [
-  { id: "agent-risk", perspective: "risk", systemPrompt: "You are a risk-focused investment analyst." },
-  { id: "agent-yield", perspective: "yield", systemPrompt: "You are a yield-focused investment analyst." },
-  { id: "agent-compliance", perspective: "compliance", systemPrompt: "You are a compliance-focused investment analyst." },
-  { id: "agent-balanced", perspective: "balanced", systemPrompt: "You are a balanced investment analyst." },
+  {
+    id: "agent-risk",
+    perspective: "risk",
+    systemPrompt: "You are a risk-focused investment analyst.",
+  },
+  // {
+  //   id: "agent-yield",
+  //   perspective: "yield",
+  //   systemPrompt: "You are a yield-focused investment analyst.",
+  // },
+  // {
+  //   id: "agent-compliance",
+  //   perspective: "compliance",
+  //   systemPrompt: "You are a compliance-focused investment analyst.",
+  // },
+  // {
+  //   id: "agent-balanced",
+  //   perspective: "balanced",
+  //   systemPrompt: "You are a balanced investment analyst.",
+  // },
 ];
 
 async function invokeAgent(
@@ -31,7 +51,9 @@ async function invokeAgent(
       return null;
     }
 
-    console.log(`[THINK] ${agent.id}: ${decision.rebalance.length} rebalance, ${decision.certify.length} certify, ${decision.issue.length} issue actions`);
+    console.log(
+      `[THINK] ${agent.id}: ${decision.rebalance.length} rebalance, ${decision.certify.length} certify, ${decision.issue.length} issue actions`,
+    );
     return decision;
   } catch (err) {
     console.error(`[THINK] ${agent.id} failed:`, (err as Error).message);
@@ -52,22 +74,35 @@ export async function think(
 ): Promise<ThinkResult> {
   console.log("\n[THINK] ========================================");
   console.log(`[THINK] Strategy: ${strategy.name}`);
-  console.log(`[THINK] Spawning ${AGENT_PERSPECTIVES.length} agents in parallel...`);
+  console.log(
+    `[THINK] Spawning ${AGENT_PERSPECTIVES.length} agents in parallel...`,
+  );
   const t0 = Date.now();
 
   // Spawn all 4 agents in parallel
   const results = await Promise.all(
-    AGENT_PERSPECTIVES.map(agent => invokeAgent(agent, strategy, snapshot, llm))
+    AGENT_PERSPECTIVES.map((agent) =>
+      invokeAgent(agent, strategy, snapshot, llm),
+    ),
   );
 
   // Filter out failed/invalid responses
   const validDecisions = results.filter((d): d is AgentDecision => d !== null);
-  console.log(`[THINK] ${validDecisions.length}/${AGENT_PERSPECTIVES.length} agents returned valid decisions`);
+  console.log(
+    `[THINK] ${validDecisions.length}/${AGENT_PERSPECTIVES.length} agents returned valid decisions`,
+  );
 
   if (validDecisions.length === 0) {
     console.warn("[THINK] No valid decisions — returning empty quorum");
     return {
-      quorum: { rebalance: [], certify: [], issue: [], rawDecisions: [], quorumThreshold: 3, totalAgents: 4 },
+      quorum: {
+        rebalance: [],
+        certify: [],
+        issue: [],
+        rawDecisions: [],
+        quorumThreshold: 3,
+        totalAgents: 4,
+      },
       durationMs: Date.now() - t0,
     };
   }

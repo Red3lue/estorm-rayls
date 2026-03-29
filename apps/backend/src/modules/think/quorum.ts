@@ -2,9 +2,10 @@ import type {
   AgentDecision, QuorumResult, QuorumAction,
   RebalanceAction, CertifyDecision, IssueDecision,
 } from "../../types/think.js";
+import { config } from "../../config/index.js";
 
-const QUORUM_THRESHOLD = 3;
-const TOTAL_AGENTS = 4;
+const QUORUM_THRESHOLD = config.agent.quorumThreshold;
+const TOTAL_AGENTS = config.agent.totalAgents;
 
 /**
  * Generates a stable key for comparing equivalent actions across agents.
@@ -58,21 +59,44 @@ function applyQuorum<T>(
 /**
  * Applies the 3/4 quorum rule across all agent decisions.
  * An action is approved only if 3 out of 4 agents proposed it.
+ *
+ * Returns at most ONE approved action (the highest-voted one).
+ * This ensures the protocol processes exactly one decision per cycle,
+ * so ATTEST and ISSUE are only triggered when that single action succeeds on-chain.
  */
 export function computeQuorum(decisions: AgentDecision[]): QuorumResult {
-  const rebalance = applyQuorum(decisions, d => d.rebalance, rebalanceKey);
-  const certify = applyQuorum(decisions, d => d.certify, certifyKey);
-  const issue = applyQuorum(decisions, d => d.issue, issueKey);
+  const allRebalance = applyQuorum(decisions, d => d.rebalance, rebalanceKey);
+  const allCertify = applyQuorum(decisions, d => d.certify, certifyKey);
+  const allIssue = applyQuorum(decisions, d => d.issue, issueKey);
 
-  const approvedCount = [...rebalance, ...certify, ...issue].filter(a => a.approved).length;
-  const rejectedCount = [...rebalance, ...certify, ...issue].filter(a => !a.approved).length;
+  const all = [
+    ...allRebalance.map(a => ({ ...a, _src: "rebalance" as const })),
+    ...allCertify.map(a => ({ ...a, _src: "certify" as const })),
+    ...allIssue.map(a => ({ ...a, _src: "issue" as const })),
+  ];
 
-  console.log(`[THINK] Quorum: ${approvedCount} actions approved, ${rejectedCount} discarded (threshold: ${QUORUM_THRESHOLD}/${TOTAL_AGENTS})`);
-
-  for (const a of [...rebalance, ...certify, ...issue]) {
+  for (const a of all) {
     const status = a.approved ? "APPROVED" : "REJECTED";
     const key = "type" in a.action ? `${(a.action as RebalanceAction).type}` : "action" in a.action ? `${(a.action as IssueDecision).action}` : "certify";
     console.log(`[THINK]   ${status} [${a.approvedBy.length}/${TOTAL_AGENTS}] ${key}: ${a.approvedBy.join(", ")} | rejected: ${a.rejectedBy.join(", ") || "none"}`);
+  }
+
+  // Pick the single highest-voted approved action
+  const winner = all
+    .filter(a => a.approved)
+    .sort((a, b) => b.approvedBy.length - a.approvedBy.length)[0] ?? null;
+
+  const rebalance: QuorumAction<RebalanceAction>[] = [];
+  const certify: QuorumAction<CertifyDecision>[] = [];
+  const issue: QuorumAction<IssueDecision>[] = [];
+
+  if (winner) {
+    if (winner._src === "rebalance") rebalance.push(winner as unknown as QuorumAction<RebalanceAction>);
+    else if (winner._src === "certify") certify.push(winner as unknown as QuorumAction<CertifyDecision>);
+    else if (winner._src === "issue") issue.push(winner as unknown as QuorumAction<IssueDecision>);
+    console.log(`[THINK] Quorum: selected 1 action (${winner._src}) with ${winner.approvedBy.length}/${TOTAL_AGENTS} votes`);
+  } else {
+    console.log(`[THINK] Quorum: no action reached threshold (${QUORUM_THRESHOLD}/${TOTAL_AGENTS})`);
   }
 
   return {

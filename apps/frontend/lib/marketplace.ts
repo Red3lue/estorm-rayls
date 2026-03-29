@@ -132,8 +132,8 @@ async function fetchActiveListings(): Promise<MarketplaceListing[]> {
         tokenName,
         tokenSymbol,
         tokenType: isShare ? "share" : isReceipt ? "receipt" : "share",
-        amount: Number(raw.amount),
-        price: Number(raw.price),
+        amount: Number(ethers.formatUnits(raw.amount, 18)),
+        price: Number(ethers.formatUnits(raw.price, 18)),
         active: true,
         certSummary,
       });
@@ -169,7 +169,7 @@ async function fetchHoldings(): Promise<TokenHolding[]> {
         address,
         symbol,
         type,
-        balance: Number(balance),
+        balance: Number(ethers.formatUnits(balance, 18)),
       });
     } catch {
       /* not deployed */
@@ -194,8 +194,8 @@ async function fetchShareInfo(): Promise<ShareInfo | null> {
       share.getSharePrice(),
     ]);
     return {
-      nav: Number(nav),
-      sharePrice: Number(price),
+      nav: Number(nav) / 100,           // cents → dollars
+      sharePrice: Number(price) / 100,   // cents → dollars
       riskScore: 0,
     };
   } catch {
