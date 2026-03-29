@@ -70,6 +70,8 @@ async function readVaultLedger(provider: ethers.JsonRpcProvider): Promise<{ erc2
         allocationPct: Number(a.allocationPct),       // uint8 0-100
         riskScore: Number(a.riskScore),                // uint8 0-100
         yieldRate: Number(a.yieldBps) / 100,           // bps → percentage (420 → 4.2%)
+        balance: a.balance as bigint,                  // VaultLedger-tracked balance
+        valueUSD: Number(a.valueUSD),                  // cents
       });
     }
 
@@ -111,8 +113,10 @@ export async function observe(): Promise<VaultSnapshot> {
   ]);
 
   const fungibles = erc20s.map(t => buildFungibleAsset(t, ledger.erc20Meta.get(t.address.toLowerCase())));
+
+  // Include NFTs that are either owned by agent OR tracked in VaultLedger
   const nonFungibles = erc721s
-    .filter(t => t.owned)
+    .filter(t => t.owned || ledger.erc721Meta.has(`${t.address.toLowerCase()}-${t.tokenId}`))
     .map(t => buildNonFungibleAsset(t, ledger.erc721Meta.get(`${t.address.toLowerCase()}-${t.tokenId}`)));
 
   const snapshot = buildSnapshot(fungibles, nonFungibles);

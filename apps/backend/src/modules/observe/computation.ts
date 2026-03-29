@@ -26,6 +26,10 @@ export interface Erc20Meta {
   allocationPct: number;
   riskScore: number;
   yieldRate: number;
+  /** VaultLedger-tracked balance (raw units). Overrides balanceOf(agent) when present. */
+  balance?: bigint;
+  /** VaultLedger-tracked value in cents. */
+  valueUSD?: number;
 }
 
 export interface Erc721Meta {
@@ -48,16 +52,19 @@ export const DEFAULT_ERC721_META: Record<string, Erc721Meta> = {
 
 export function buildFungibleAsset(token: RawErc20Read, ledgerMeta: Erc20Meta | undefined): FungibleAsset {
   const meta = ledgerMeta ?? DEFAULT_ERC20_META[token.symbol] ?? { allocationPct: 0, riskScore: 50, yieldRate: 0 };
+  // Prefer VaultLedger balance (tokens are held by VaultLedger, not agent wallet)
+  const balance = meta.balance ?? token.balance;
+  const value = meta.valueUSD != null ? meta.valueUSD / 100 : Number(ethers.formatUnits(balance, token.decimals));
   return {
     address: token.address,
     symbol: token.symbol,
     name: token.name,
-    balance: token.balance,
+    balance,
     decimals: token.decimals,
     allocationPct: meta.allocationPct,
     yieldRate: meta.yieldRate,
     riskScore: meta.riskScore,
-    value: Number(ethers.formatUnits(token.balance, token.decimals)),
+    value,
   };
 }
 
