@@ -121,14 +121,23 @@ export async function fetchGovernanceSnapshot(): Promise<GovernanceSnapshot> {
 
   const contract = getReadContract();
 
-  const [pendingRaw, settingsRaw, historyRaw] = await Promise.all([
-    contract.getPendingProposal(),
+  // getPendingProposal() reverts with "no pending proposal" when none exists
+  const pendingIdRaw = await contract.pendingProposalId();
+  let pending: Proposal | null = null;
+
+  if (Number(pendingIdRaw) > 0) {
+    try {
+      const pendingRaw = await contract.getPendingProposal();
+      pending = mapProposal(pendingRaw);
+    } catch {
+      // reverted — no pending proposal
+    }
+  }
+
+  const [settingsRaw, historyRaw] = await Promise.all([
     contract.getSettings(),
     contract.getProposalHistory(),
   ]);
-
-  const pending =
-    Number(pendingRaw.id) > 0 ? mapProposal(pendingRaw) : null;
 
   const [rules, categoryPerms] = settingsRaw;
   const settings: GovernanceSettings = {
