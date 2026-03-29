@@ -37,6 +37,8 @@ export interface InvestorAttestation {
   quorumTotal: number;
   nav: number;
   riskScore: number;
+  portfolioBreakdown: string;
+  yieldHistory: string;
 }
 
 export interface InvestorData {
@@ -213,6 +215,8 @@ async function fetchInvestorAttestations(): Promise<InvestorAttestation[]> {
           quorumTotal: Number(raw.quorumTotal),
           nav: Number(raw.nav),
           riskScore: Number(raw.riskScore),
+          portfolioBreakdown: raw.portfolioBreakdown,
+          yieldHistory: raw.yieldHistory,
         });
       }
     }

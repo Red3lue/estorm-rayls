@@ -2,6 +2,7 @@
 
 import { useInvestorData } from "@/lib/use-investor-data";
 import { formatUSD, formatBps, riskColor } from "@/lib/format";
+import { AttestationDisclosure } from "@/components/attestation-disclosure";
 import type { InvestorData, InvestorAttestation, ReceiptTokenInfo } from "@/lib/investor";
 
 const DECISION_TYPE_LABELS: Record<number, string> = {
@@ -11,9 +12,9 @@ const DECISION_TYPE_LABELS: Record<number, string> = {
 };
 
 const ORIGIN_LABELS: Record<number, string> = {
-  0: "AI Quorum",
-  1: "Human Approved",
-  2: "Human Initiated",
+  0: "AI_QUORUM",
+  1: "HUMAN_APPROVED",
+  2: "HUMAN_INITIATED",
 };
 
 export default function InvestorPage() {
@@ -42,6 +43,7 @@ export default function InvestorPage() {
         <div className="flex flex-col gap-8">
           <MetricsSection metrics={data.metrics} />
           <ReceiptTokensSection tokens={data.receiptTokens} />
+          <DisclosureSection attestations={data.attestations} />
           <AttestationHistorySection attestations={data.attestations} />
         </div>
       )}
@@ -191,8 +193,27 @@ function ReceiptCard({ token }: { token: ReceiptTokenInfo }) {
   );
 }
 
+// ── Disclosure Section ──────────────────────────────────────────────────────
+// Renders institution-specific disclosure data from the latest attestation.
+// Generic component reads whatever Attestation.sol exposes beyond base fields.
+
+function DisclosureSection({
+  attestations,
+}: {
+  attestations: InvestorAttestation[];
+}) {
+  const latest = attestations[0];
+  if (!latest) return null;
+
+  return (
+    <section>
+      <AttestationDisclosure attestation={latest} />
+    </section>
+  );
+}
+
 // ── Attestation History Section ──────────────────────────────────────────────
-// Shows only aggregated data — no reasoning, no asset names, no counterparties (AC #4)
+// Shows publicly disclosed data only — no private vault addresses, counterparties, or strategy parameters (AC #7)
 
 function AttestationHistorySection({
   attestations,
