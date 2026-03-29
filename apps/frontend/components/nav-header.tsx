@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -19,11 +20,22 @@ export function NavHeader() {
     <header className="border-b border-border bg-surface px-6 py-4">
       <div className="mx-auto flex max-w-6xl items-center justify-between">
         <div className="flex items-center gap-8">
-          <div>
-            <h1 className="text-lg font-semibold tracking-tight text-foreground">
-              Sovereign Vault Protocol
-            </h1>
-            <p className="text-xs text-muted">Vault Manager Dashboard</p>
+          <div className="flex items-center gap-2.5">
+            <Image
+              src="/bifrost-logo.svg"
+              alt=""
+              width={32}
+              height={32}
+              aria-hidden="true"
+            />
+            <div>
+              <h1 className="text-lg font-semibold tracking-tight text-foreground">
+                Bifrost Protocol
+              </h1>
+              <p className="text-xs text-muted">
+                The bridge between private vaults and public markets
+              </p>
+            </div>
           </div>
           <nav aria-label="Main navigation">
             <ul className="flex gap-1">

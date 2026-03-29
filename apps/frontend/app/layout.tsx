@@ -14,8 +14,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Sovereign Vault Protocol",
-  description: "AI-Powered Institutional Vault Manager",
+  title: "Bifrost Protocol",
+  description: "The bridge between private vaults and public markets",
+  icons: { icon: "/bifrost-logo.svg" },
 };
 
 export default function RootLayout({
@@ -31,6 +32,9 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-background text-foreground font-sans">
         <NavHeader />
         {children}
+        <footer className="border-t border-border bg-surface px-6 py-3 text-center text-xs text-muted">
+          Built by eStorm
+        </footer>
       </body>
     </html>
   );
