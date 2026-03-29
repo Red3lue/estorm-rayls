@@ -12,7 +12,11 @@ export const CONTRACTS = {
   attestation: process.env.NEXT_PUBLIC_ATTESTATION_ADDRESS ?? "",
   vaultShareToken: process.env.NEXT_PUBLIC_VAULT_SHARE_TOKEN_ADDRESS ?? "",
   receiptToken: process.env.NEXT_PUBLIC_RECEIPT_TOKEN_ADDRESS ?? "",
+  vaultPolicy: process.env.VAULT_POLICY_ADDRESS ?? "",
 } as const;
+
+/** Server-only: deployer key for signing governance transactions */
+export const DEPLOYER_KEY = process.env.DEPLOYER_PRIVATE_KEY ?? "";
 
 export const BACKEND_API = "http://localhost:3001";
 
