@@ -13,7 +13,8 @@
     "build:contracts": "npm run build --workspace=contracts",
     "test:contracts": "npm run test --workspace=contracts",
     "deploy:contracts:private": "npm run deploy:private --workspace=contracts",
-    "deploy:contracts:public": "npm run deploy:public --workspace=contracts"
+    "deploy:contracts:public": "npm run deploy:public --workspace=contracts",
+    "agent": "npm run agent --workspace=backend"
   },
   "devDependencies": {
     "concurrently": "^9.1.2"
