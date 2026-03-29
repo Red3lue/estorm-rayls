@@ -7,6 +7,7 @@ import { getAttestationWriterWallet } from "../clients/publicChain.js";
 import { config } from "../config/index.js";
 import { injectShock } from "../modules/shock/index.js";
 import { injectOpportunity } from "../modules/opportunity/index.js";
+import { teleportToPrivacyNode, teleportToPublicChain, checkPublicChainBalance, checkMirrorBalance } from "../modules/teleport/index.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -205,6 +206,83 @@ export function createServer() {
   });
 
   /**
+   * POST /api/teleport/to-privacy
+   *
+   * Bridge tokens from Public Chain → Privacy Node via the mirror's teleportToPrivacyNode().
+   * Burns tokens on Public Chain, relayer unlocks on Privacy Node.
+   *
+   * Body: { mirrorAddress: "0x..." }
+   * Response: { txHash, amount, direction }
+   */
+  app.post("/api/teleport/to-privacy", async (req: Request, res: Response) => {
+    const { mirrorAddress } = req.body as { mirrorAddress: string };
+    if (!mirrorAddress) {
+      res.status(400).json({ error: "mirrorAddress is required" });
+      return;
+    }
+    try {
+      const result = await teleportToPrivacyNode(mirrorAddress);
+      res.json({ ...result, amount: result.amount.toString() });
+    } catch (err) {
+      console.error("[API] Teleport to privacy failed:", (err as Error).message);
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  /**
+   * POST /api/teleport/to-public
+   *
+   * Bridge tokens from Privacy Node → Public Chain.
+   * Locks on Privacy Node, relayer mints on Public Chain mirror.
+   *
+   * Body: { tokenAddress: "0x...", amount: "1000000000000000000", recipient: "0x..." }
+   * Response: { txHash, amount, direction }
+   */
+  app.post("/api/teleport/to-public", async (req: Request, res: Response) => {
+    const { tokenAddress, amount, recipient } = req.body as {
+      tokenAddress: string;
+      amount: string;
+      recipient: string;
+    };
+    if (!tokenAddress || !amount || !recipient) {
+      res.status(400).json({ error: "tokenAddress, amount, and recipient are required" });
+      return;
+    }
+    try {
+      const result = await teleportToPublicChain(tokenAddress, BigInt(amount), recipient);
+      res.json({ ...result, amount: result.amount.toString() });
+    } catch (err) {
+      console.error("[API] Teleport to public failed:", (err as Error).message);
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  /**
+   * GET /api/teleport/balance
+   *
+   * Check agent's balances on Public Chain (native USDr + optional mirror token).
+   *
+   * Query: ?mirror=0x...  (optional mirror address)
+   * Response: { nativeUSDr: "...", mirrorBalance?: "..." }
+   */
+  app.get("/api/teleport/balance", async (req: Request, res: Response) => {
+    try {
+      const nativeBalance = await checkPublicChainBalance();
+      const result: Record<string, string> = { nativeUSDr: nativeBalance.toString() };
+
+      const mirror = req.query.mirror as string | undefined;
+      if (mirror) {
+        const mirrorBal = await checkMirrorBalance(mirror);
+        result.mirrorBalance = mirrorBal.toString();
+      }
+
+      res.json(result);
+    } catch (err) {
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  /**
    * GET /health
    */
   app.get("/health", (_req: Request, res: Response) => {
@@ -229,6 +307,9 @@ export function startServer(port = 3001): void {
     console.log(`[API]   GET  /api/attestation/:address/attestations/:token`);
     console.log(`[API]   POST /api/shock`);
     console.log(`[API]   POST /api/opportunity`);
+    console.log(`[API]   POST /api/teleport/to-privacy`);
+    console.log(`[API]   POST /api/teleport/to-public`);
+    console.log(`[API]   GET  /api/teleport/balance`);
     console.log(`[API]   GET  /health`);
   });
 }
