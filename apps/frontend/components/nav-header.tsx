@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { href: "/investor", label: "Investor" },
   { href: "/governance", label: "Governance" },
   { href: "/issuance", label: "Issuance" },
+  { href: "/marketplace", label: "Marketplace" },
 ] as const;
 
 export function NavHeader() {
