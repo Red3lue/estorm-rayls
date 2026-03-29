@@ -5,6 +5,7 @@ import { join, dirname } from "path";
 import { fileURLToPath } from "url";
 import { getAttestationWriterWallet } from "../clients/publicChain.js";
 import { config } from "../config/index.js";
+import { injectShock } from "../modules/shock/index.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -138,6 +139,36 @@ export function createServer() {
   );
 
   /**
+   * POST /api/shock
+   *
+   * Injects a market shock — changes asset risk on VaultLedger.
+   * The agent's next OBSERVE cycle will detect the change and react.
+   *
+   * Body: { asset: "RECV-ACME-90D", newRiskScore: 90, reason: "Credit downgrade" }
+   */
+  app.post("/api/shock", async (req: Request, res: Response) => {
+    const { asset, newRiskScore, newYieldBps, reason } = req.body as {
+      asset: string;
+      newRiskScore: number;
+      newYieldBps?: number;
+      reason: string;
+    };
+
+    if (!asset || newRiskScore == null || !reason) {
+      res.status(400).json({ error: "asset, newRiskScore, and reason are required" });
+      return;
+    }
+
+    try {
+      const result = await injectShock({ asset, newRiskScore, newYieldBps, reason });
+      res.json(result);
+    } catch (err) {
+      console.error("[API] Shock injection failed:", (err as Error).message);
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  /**
    * GET /health
    */
   app.get("/health", (_req: Request, res: Response) => {
@@ -160,6 +191,7 @@ export function startServer(port = 3001): void {
     console.log(`[API]   POST /api/attestation/deploy`);
     console.log(`[API]   POST /api/attestation/attest`);
     console.log(`[API]   GET  /api/attestation/:address/attestations/:token`);
+    console.log(`[API]   POST /api/shock`);
     console.log(`[API]   GET  /health`);
   });
 }
