@@ -104,7 +104,7 @@ async function fetchAggregatedMetrics(): Promise<{
   }
 
   return {
-    nav: Number(navRaw),
+    nav: Number(navRaw) / 100,             // cents → dollars
     riskScore: Math.round(weightedRisk),
     portfolioYield: weightedYield,
   };
@@ -128,8 +128,8 @@ async function fetchShareData(): Promise<{
       token.totalSupply(),
     ]);
     return {
-      sharePrice: Number(price),
-      totalShares: Number(supply),
+      sharePrice: Number(price) / 100,                     // cents → dollars
+      totalShares: Number(ethers.formatUnits(supply, 18)),
     };
   } catch {
     return { sharePrice: null, totalShares: null };
@@ -156,20 +156,21 @@ async function fetchReceiptTokens(): Promise<ReceiptTokenInfo[]> {
       token.supplyCap(),
     ]);
 
+    const decimals = 18;
     return [
       {
         name,
         symbol,
         assetType: backing.assetType,
         assetLabel: backing.assetLabel,
-        valuationUSD: Number(backing.valuationUSD),
+        valuationUSD: Number(ethers.formatUnits(backing.valuationUSD, decimals)),
         certScore: Number(backing.certScore),
         riskScore: Number(backing.riskScore),
         certified: backing.certified,
         certifiedAt: Number(backing.certifiedAt),
-        receiptPrice: Number(price),
-        totalSupply: Number(supply),
-        supplyCap: Number(cap),
+        receiptPrice: Number(ethers.formatUnits(price, decimals)),
+        totalSupply: Number(ethers.formatUnits(supply, decimals)),
+        supplyCap: Number(ethers.formatUnits(cap, decimals)),
       },
     ];
   } catch {

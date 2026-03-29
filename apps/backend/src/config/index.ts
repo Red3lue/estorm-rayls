@@ -10,6 +10,8 @@ function optional(key: string, fallback: string): string {
   return process.env[key] || fallback;
 }
 
+const useNew = optional("USE_NEW_DEPLOYMENT", "false") === "true";
+
 export const config = {
   privacyNode: {
     rpcUrl: required("PRIVACY_NODE_RPC_URL"),
@@ -45,8 +47,8 @@ export const config = {
     stableUsdr: optional("STABLE_USDR_ADDRESS", ""),
     picassoNft: optional("PICASSO_NFT_ADDRESS", ""),
     warholNft: optional("WARHOL_NFT_ADDRESS", ""),
-    vaultLedger: optional("VAULT_LEDGER_ADDRESS", ""),
-    vaultPolicy: optional("VAULT_POLICY_ADDRESS", ""),
+    vaultLedger: optional(useNew ? "VAULT_LEDGER_ADDRESS_NEW" : "VAULT_LEDGER_ADDRESS_OLD", ""),
+    vaultPolicy: optional(useNew ? "VAULT_POLICY_ADDRESS_NEW" : "VAULT_POLICY_ADDRESS_OLD", ""),
     dvpExchange: optional("DVP_EXCHANGE_ADDRESS", ""),
     mockDex: optional("MOCK_DEX_ADDRESS", ""),
     attestation: optional("ATTESTATION_ADDRESS", ""),

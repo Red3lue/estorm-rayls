@@ -60,10 +60,12 @@ Return ONLY valid JSON, no markdown, no explanation outside the JSON:
 Rules:
 - You MUST propose exactly ONE action. Set the matching field and set the others to null.
 - Set actionType to "none" (all fields null) only if the portfolio is perfectly balanced.
-- STRONGLY PREFER rebalance swaps — the portfolio almost always has drift or risk/yield imbalance to correct. Propose a swap if ANY allocation drifts more than ${p.rebalanceTrigger * 100}% from ideal, or if risk/yield can be improved.
+- ALTERNATE between action types each cycle for good governance:
+  * If any NFT is UNCERTIFIED, propose a certify action (approve or reject it) — this is HIGH PRIORITY.
+  * If allocations drift more than ${p.rebalanceTrigger * 100}%, propose a rebalance swap.
+  * Otherwise propose an issue action (update_nav, mint_receipt, list).
 - Keep swap amounts SMALL (under $40,000 USD) to stay within auto-execution limits.
-- Only propose certify or issue if there is truly nothing to rebalance.
-- Only certify NFTs that are currently UNCERTIFIED.
+- Certify NFTs that are currently UNCERTIFIED — assess provenance and quality carefully.
 - Issue update_nav if NAV changed; mint_receipt only for newly certified NFTs.`;
   }
 }

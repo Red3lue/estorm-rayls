@@ -1,6 +1,6 @@
 export const VAULT_LEDGER_ABI = [
   "function getNAV() view returns (uint256)",
-  "function getVaultSnapshot() view returns (tuple(address tokenAddress, string symbol, uint256 balance, uint256 valueUSD, uint8 allocationPct, uint8 riskScore, uint256 yieldBps, bool active)[], tuple(address tokenAddress, uint256 tokenId, string symbol, uint256 valuationUSD, bool certified, uint8 certScore, uint8 riskScore, bool active)[])",
+  "function getVaultSnapshot() view returns (tuple(address tokenAddress, string symbol, uint8 decimals, uint256 balance, uint256 valueUSD, uint8 allocationPct, uint8 riskScore, uint256 yieldBps, bool active)[], tuple(address tokenAddress, uint256 tokenId, string symbol, uint256 valuationUSD, bool certified, uint8 certScore, uint8 riskScore, bool active)[])",
   "function getERC20Count() view returns (uint256)",
   "function getERC721Count() view returns (uint256)",
 ] as const;
