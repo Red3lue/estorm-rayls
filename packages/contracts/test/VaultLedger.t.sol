@@ -287,10 +287,11 @@ contract VaultLedgerTest is Test {
         ledger.recordTrade(VaultLedger.TradeAction.REBALANCE, "test", 0, 3, false);
     }
 
-    function test_getTradeHistory_onlyOwner() public {
+    function test_getTradeHistory_publiclyReadable() public {
+        ledger.recordTrade(VaultLedger.TradeAction.REBALANCE, "r1", 0, 3, false);
         vm.prank(alice);
-        vm.expectRevert();
-        ledger.getTradeHistory();
+        VaultLedger.TradeRecord[] memory history = ledger.getTradeHistory();
+        assertEq(history.length, 1);
     }
 
     function test_multipleTradeRecords() public {

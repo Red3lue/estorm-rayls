@@ -374,7 +374,7 @@ contract VaultLedger is Ownable {
         emit TradeRecorded(_tradeHistory.length - 1, action, navAfter, humanApproved);
     }
 
-    function getTradeHistory() external view onlyOwner returns (TradeRecord[] memory) {
+    function getTradeHistory() external view returns (TradeRecord[] memory) {
         return _tradeHistory;
     }
 

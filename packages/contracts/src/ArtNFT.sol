@@ -49,7 +49,7 @@ contract ArtNFT is RaylsErc721Handler {
         string calldata artist,
         uint256 valuationUSD
     ) external onlyOwner {
-        mint(to, tokenId);
+        _mint(to, tokenId);
         metadata[tokenId] = ArtMetadata({
             title: title,
             artist: artist,
