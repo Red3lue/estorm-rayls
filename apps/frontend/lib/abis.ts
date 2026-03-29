@@ -55,3 +55,11 @@ export const VAULT_POLICY_ABI = [
   "function getSettings() view returns (tuple(uint256 valueThreshold, uint256 maxTxPerWindow, uint256 windowDuration, bool paused), bool[6])",
   "function pendingProposalId() view returns (uint256)",
 ] as const;
+
+export const MARKETPLACE_ABI = [
+  "function list(address token, uint8 assetType, uint256 tokenId, uint256 amount, uint256 price) external returns (uint256 listingId)",
+  "function delist(uint256 listingId) external",
+  "function getListing(uint256 listingId) view returns (tuple(address token, uint8 assetType, uint256 tokenId, uint256 amount, uint256 price, bool active, address seller))",
+  "function getActiveListings() view returns (uint256[])",
+  "function getListingCount() view returns (uint256)",
+] as const;

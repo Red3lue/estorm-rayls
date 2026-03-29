@@ -13,6 +13,7 @@ export const CONTRACTS = {
   vaultShareToken: process.env.NEXT_PUBLIC_VAULT_SHARE_TOKEN_ADDRESS ?? "",
   receiptToken: process.env.NEXT_PUBLIC_RECEIPT_TOKEN_ADDRESS ?? "",
   vaultPolicy: process.env.VAULT_POLICY_ADDRESS ?? "",
+  marketplace: process.env.NEXT_PUBLIC_MARKETPLACE_ADDRESS ?? "",
 } as const;
 
 /** Server-only: deployer key for signing governance transactions */
