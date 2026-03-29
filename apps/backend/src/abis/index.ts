@@ -33,3 +33,22 @@ export const VAULT_LEDGER_ABI = [
   "function getERC20Count() view returns (uint256)",
   "function getERC721Count() view returns (uint256)",
 ] as const;
+
+/** VaultPolicy.sol — governance gateway on Privacy Node */
+export const VAULT_POLICY_ABI = [
+  "function propose(address target, bytes callData, uint8 category, string reasoning, uint8 quorumVotes) external returns (uint256 id)",
+  "function withdraw(uint256 proposalId) external",
+  "function approve(uint256 proposalId) external",
+  "function dismiss(uint256 proposalId) external",
+  "function emergencyStop() external",
+  "function resume() external",
+  "function getPendingProposal() view returns (tuple(uint256 id, address target, bytes callData, uint8 category, uint256 valueUSD, string reasoning, uint8 quorumVotes, uint8 status, uint256 createdAt, uint256 resolvedAt, address resolvedBy))",
+  "function getProposalHistory() view returns (tuple(uint256 id, address target, bytes callData, uint8 category, uint256 valueUSD, string reasoning, uint8 quorumVotes, uint8 status, uint256 createdAt, uint256 resolvedAt, address resolvedBy)[])",
+  "function getSettings() view returns (tuple(uint256 valueThreshold, uint256 maxTxPerWindow, uint256 windowDuration, bool paused), bool[6])",
+  "function pendingProposalId() view returns (uint256)",
+  "event ProposalAutoExecuted(uint256 indexed id, uint8 category, uint8 quorumVotes, uint256 derivedValueUSD, address target)",
+  "event ProposalPending(uint256 indexed id, uint8 category, uint8 quorumVotes, uint256 derivedValueUSD, string reasoning)",
+  "event ProposalApproved(uint256 indexed id, address indexed by)",
+  "event ProposalWithdrawn(uint256 indexed id)",
+  "event ExecutionFailed(uint256 indexed id, bytes reason)",
+] as const;
