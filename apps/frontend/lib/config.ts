@@ -10,6 +10,8 @@ export const CONTRACTS = {
   picassoNft: "0x24a059519f65659337cDafddc104835C11BCb5ce",
   warholNft: "0xb6ab2e98811bFf69Fc60Fb1Cc83A2E043C096247",
   attestation: process.env.NEXT_PUBLIC_ATTESTATION_ADDRESS ?? "",
+  vaultShareToken: process.env.NEXT_PUBLIC_VAULT_SHARE_TOKEN_ADDRESS ?? "",
+  receiptToken: process.env.NEXT_PUBLIC_RECEIPT_TOKEN_ADDRESS ?? "",
 } as const;
 
 export const BACKEND_API = "http://localhost:3001";

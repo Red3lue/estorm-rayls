@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const NAV_ITEMS = [
   { href: "/", label: "Vault" },
   { href: "/decisions", label: "AI Decisions" },
+  { href: "/investor", label: "Investor" },
 ] as const;
 
 export function NavHeader() {

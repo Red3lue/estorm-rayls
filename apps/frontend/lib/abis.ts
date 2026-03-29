@@ -25,3 +25,22 @@ export const ATTESTATION_ABI = [
   "function getAttestationCount() view returns (uint256)",
   "event AttestationRecorded(address indexed token, address indexed attester, bool approved, uint8 decisionType, uint8 decisionOrigin, uint8 quorumVotes, uint256 nav, uint256 timestamp)",
 ] as const;
+
+export const VAULT_SHARE_TOKEN_ABI = [
+  "function getSharePrice() view returns (uint256)",
+  "function getNAV() view returns (uint256)",
+  "function totalSupply() view returns (uint256)",
+  "function decimals() view returns (uint8)",
+  "function name() view returns (string)",
+  "function symbol() view returns (string)",
+] as const;
+
+export const RECEIPT_TOKEN_ABI = [
+  "function getBackingInfo() view returns (tuple(string assetType, string assetLabel, uint256 valuationUSD, uint256 certScore, uint256 riskScore, string provenanceHash, uint256 certifiedAt, bool certified))",
+  "function getReceiptPrice() view returns (uint256)",
+  "function getAttestation() view returns (tuple(address attester, address token, bool approved, string reason, uint256 score, uint256 timestamp, uint8 decisionType, uint8 decisionOrigin, uint8 quorumVotes, uint8 quorumTotal, uint256 nav, uint256 riskScore, string portfolioBreakdown, string yieldHistory))",
+  "function supplyCap() view returns (uint256)",
+  "function totalSupply() view returns (uint256)",
+  "function name() view returns (string)",
+  "function symbol() view returns (string)",
+] as const;
