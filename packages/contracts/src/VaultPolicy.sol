@@ -76,6 +76,9 @@ contract VaultPolicy {
     // VaultLedger.swap(address,uint256,address,uint256,address)
     bytes4 internal constant SEL_SWAP =
         bytes4(keccak256("swap(address,uint256,address,uint256,address)"));
+    // VaultLedger.createDvPExchange(address,uint256,address,address,uint256,address,uint256)
+    bytes4 internal constant SEL_CREATE_DVP =
+        bytes4(keccak256("createDvPExchange(address,uint256,address,address,uint256,address,uint256)"));
     // VaultLedger.updateERC721(address,uint256,uint256,bool,uint8,uint8)
     bytes4 internal constant SEL_UPDATE_ERC721 =
         bytes4(keccak256("updateERC721(address,uint256,uint256,bool,uint8,uint8)"));
@@ -168,6 +171,7 @@ contract VaultPolicy {
         allowedSelectors[SEL_ADD_ERC20]       = true;
         allowedSelectors[SEL_UPDATE_PORTFOLIO] = true;
         allowedSelectors[SEL_SWAP]             = true;
+        allowedSelectors[SEL_CREATE_DVP]       = true;
         allowedSelectors[SEL_UPDATE_ERC721]    = true;
         allowedSelectors[SEL_CERTIFY]          = true;
         // VaultLedger.addERC721Asset(address,uint256,string,uint256,uint8)
@@ -377,9 +381,10 @@ contract VaultPolicy {
     ///               → current VaultLedger NAV (whole portfolio at stake)
     ///           addERC20Asset(address,string,uint8,uint256)
     ///               → live oracle value of vault's current balance of that token
-    ///                 (tokens must be in vault before proposal)
     ///           swap(address,uint256,address,uint256,address)
-    ///               → oracle value of amountIn being sold  (VaultLedger.getTokenValue)
+    ///               → oracle value of amountIn being sold
+    ///           createDvPExchange(address,uint256,address,address,uint256,address,uint256)
+    ///               → oracle value of amountIn being sold (same as swap)
     ///           updateERC721(address,uint256,uint256,bool,uint8,uint8)
     ///               → valuationUSD from calldata param 2
     ///           certify(uint256,uint8,string)
@@ -409,6 +414,18 @@ contract VaultPolicy {
         // swap(address tokenIn, uint256 amountIn, address tokenOut, uint256 amountOut, address dex)
         // value = oracle price of amountIn being sold
         if (sel == SEL_SWAP && callData.length >= 68) {
+            address tokenIn;
+            uint256 amountIn;
+            assembly {
+                tokenIn  := mload(add(add(callData, 32),  4))
+                amountIn := mload(add(add(callData, 32), 36))
+            }
+            return IVaultLedger(vaultLedger).getTokenValue(tokenIn, amountIn);
+        }
+
+        // createDvPExchange(address tokenIn, uint256 amountIn, address, address, uint256, address, uint256)
+        // value = oracle price of amountIn being sold (same logic as swap)
+        if (sel == SEL_CREATE_DVP && callData.length >= 68) {
             address tokenIn;
             uint256 amountIn;
             assembly {

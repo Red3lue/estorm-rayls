@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {VaultLedger} from "../src/VaultLedger.sol";
 import {PriceOracle} from "../src/PriceOracle.sol";
 import {MockDEX} from "../src/MockDEX.sol";
+import {DvPExchange} from "../src/DvPExchange.sol";
 import {MockERC20} from "./mocks/Mocks.sol";
 
 contract VaultLedgerTest is Test {
@@ -299,5 +300,120 @@ contract VaultLedgerTest is Test {
         assertEq(ledger.getTradeCount(), 3);
         VaultLedger.TradeRecord[] memory h = ledger.getTradeHistory();
         assertEq(uint8(h[1].action), uint8(VaultLedger.TradeAction.CERTIFY));
+    }
+
+    // ─── createDvPExchange ──────────────────────────────────────────────────
+
+    function test_createDvPExchange_escrrowsBond() public {
+        ledger.addERC20Asset(address(bond),   "BOND-GOV-6M",  15,  420);
+        ledger.addERC20Asset(address(stable), "STABLE-USDr",   0,    0);
+
+        DvPExchange dvp = new DvPExchange();
+        address counterparty = makeAddr("cp");
+
+        uint256 amountIn = 100e18;
+        uint256 amountOut = 10_000e6;
+        uint256 expiration = block.timestamp + 1 hours;
+
+        uint256 bondBefore = bond.balanceOf(address(ledger));
+
+        ledger.createDvPExchange(
+            address(bond), amountIn, counterparty,
+            address(stable), amountOut, address(dvp), expiration
+        );
+
+        // Bond moved from vault to DvP escrow
+        assertEq(bond.balanceOf(address(ledger)), bondBefore - amountIn);
+        assertEq(bond.balanceOf(address(dvp)),    amountIn);
+    }
+
+    function test_createDvPExchange_returnsExchangeId() public {
+        ledger.addERC20Asset(address(bond),   "BOND-GOV-6M",  15,  420);
+        ledger.addERC20Asset(address(stable), "STABLE-USDr",   0,    0);
+
+        DvPExchange dvp = new DvPExchange();
+        uint256 id = ledger.createDvPExchange(
+            address(bond), 100e18, makeAddr("cp"),
+            address(stable), 10_000e6, address(dvp), block.timestamp + 1 hours
+        );
+        assertEq(id, 0);
+    }
+
+    function test_createDvPExchange_refreshesNAV() public {
+        ledger.addERC20Asset(address(bond),   "BOND-GOV-6M",  15,  420);
+        ledger.addERC20Asset(address(stable), "STABLE-USDr",   0,    0);
+
+        uint256 navBefore = ledger.getNAV();
+        DvPExchange dvp = new DvPExchange();
+
+        ledger.createDvPExchange(
+            address(bond), 100e18, makeAddr("cp"),
+            address(stable), 10_000e6, address(dvp), block.timestamp + 1 hours
+        );
+
+        // NAV should drop by value of 100 bond tokens
+        uint256 navAfter = ledger.getNAV();
+        assertLt(navAfter, navBefore);
+        assertEq(navBefore - navAfter, 100 * BOND_PRICE);
+    }
+
+    function test_createDvPExchange_thenCounterpartySettles() public {
+        ledger.addERC20Asset(address(bond),   "BOND-GOV-6M",  15,  420);
+        ledger.addERC20Asset(address(stable), "STABLE-USDr",   0,    0);
+
+        DvPExchange dvp = new DvPExchange();
+        address cp = makeAddr("cp");
+        uint256 amountIn  = 100e18;
+        uint256 amountOut = 10_000e6;
+
+        // Fund counterparty with stable
+        stable.mint(cp, amountOut);
+        vm.prank(cp);
+        stable.approve(address(dvp), amountOut);
+
+        uint256 stableBefore = stable.balanceOf(address(ledger));
+
+        uint256 id = ledger.createDvPExchange(
+            address(bond), amountIn, cp,
+            address(stable), amountOut, address(dvp), block.timestamp + 1 hours
+        );
+
+        // Counterparty settles the exchange
+        vm.prank(cp);
+        dvp.executeExchange(id);
+
+        // Counterparty got the bond tokens
+        assertEq(bond.balanceOf(cp), amountIn);
+        // Vault DIDN'T get stable (beneficiary was set to cp in this test path)
+        // Actually, beneficiary is address(ledger) in createDvPExchange
+        // Wait - let me check. createDvPExchange sets beneficiary = address(this) = ledger
+        // But counterparty is set to `cp` — the counterparty calls execute.
+        // Leg 1: pull counterpartyAsset from executor(cp) → send to beneficiary(ledger)
+        // Leg 2: release creatorAsset from escrow → send to executor(cp)
+        assertEq(stable.balanceOf(address(ledger)), stableBefore + amountOut);
+        assertEq(bond.balanceOf(cp), amountIn);
+    }
+
+    function test_createDvPExchange_unregisteredToken_reverts() public {
+        ledger.addERC20Asset(address(bond), "BOND-GOV-6M", 15, 420);
+        DvPExchange dvp = new DvPExchange();
+        vm.expectRevert("tokenOut not registered");
+        ledger.createDvPExchange(
+            address(bond), 100e18, makeAddr("cp"),
+            address(stable), 10_000e6, address(dvp), block.timestamp + 1 hours
+        );
+    }
+
+    function test_createDvPExchange_onlyOwner() public {
+        ledger.addERC20Asset(address(bond),   "BOND-GOV-6M",  15,  420);
+        ledger.addERC20Asset(address(stable), "STABLE-USDr",   0,    0);
+        DvPExchange dvp = new DvPExchange();
+
+        vm.prank(alice);
+        vm.expectRevert();
+        ledger.createDvPExchange(
+            address(bond), 100e18, makeAddr("cp"),
+            address(stable), 10_000e6, address(dvp), block.timestamp + 1 hours
+        );
     }
 }

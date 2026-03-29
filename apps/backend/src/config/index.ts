@@ -35,6 +35,7 @@ export const config = {
     warholNft: optional("WARHOL_NFT_ADDRESS", ""),
     vaultLedger: optional("VAULT_LEDGER_ADDRESS", ""),
     vaultPolicy: optional("VAULT_POLICY_ADDRESS", ""),
+    dvpExchange: optional("DVP_EXCHANGE_ADDRESS", ""),
     attestation: optional("ATTESTATION_ADDRESS", ""),
     vaultShareToken: optional("VAULT_SHARE_TOKEN_ADDRESS", ""),
     receiptToken: optional("RECEIPT_TOKEN_ADDRESS", ""),
