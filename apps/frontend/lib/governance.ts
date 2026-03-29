@@ -404,3 +404,19 @@ export async function resumeOperations(): Promise<{ txHash: string }> {
   const receipt = await tx.wait();
   return { txHash: receipt.hash };
 }
+
+export async function setCategoryPermission(
+  category: number,
+  allowed: boolean,
+): Promise<{ txHash: string }> {
+  if (!Number.isInteger(category) || category < 0 || category > 255) {
+    throw new Error("Invalid category; expected an integer between 0 and 255");
+  }
+
+  const contract = await getWriteContract();
+  const tx = await contract.setCategoryPermission(category, allowed, {
+    gasLimit: 250_000,
+  });
+  const receipt = await tx.wait();
+  return { txHash: receipt.hash };
+}

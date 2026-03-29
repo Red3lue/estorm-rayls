@@ -19,19 +19,27 @@ let cycleNumber = 0;
 
 function setupGracefulShutdown(): void {
   const shutdown = (signal: string) => {
-    console.log(`\n[LOOP] Received ${signal} — stopping after current cycle...`);
+    console.log(
+      `\n[LOOP] Received ${signal} — stopping after current cycle...`,
+    );
     running = false;
   };
   process.on("SIGINT", () => shutdown("SIGINT"));
   process.on("SIGTERM", () => shutdown("SIGTERM"));
 }
 
-async function checkPendingAndWithdraw(snapshot: VaultSnapshot): Promise<number> {
+async function checkPendingAndWithdraw(
+  snapshot: VaultSnapshot,
+): Promise<number> {
   if (!config.contracts.vaultPolicy) return 0;
 
   try {
     const wallet = getAgentWallet();
-    const policy = new ethers.Contract(config.contracts.vaultPolicy, VAULT_POLICY_ABI, wallet);
+    const policy = new ethers.Contract(
+      config.contracts.vaultPolicy,
+      VAULT_POLICY_ABI,
+      wallet,
+    );
     const pendingId = Number(await policy.pendingProposalId());
 
     if (pendingId === 0) return 0;
@@ -45,8 +53,10 @@ async function checkPendingAndWithdraw(snapshot: VaultSnapshot): Promise<number>
 
     // If NAV drifted significantly since the proposal, it may be invalidated
     const drift = Math.abs(currentNav - navAtProposal) / (navAtProposal || 1);
-    if (drift > 0.10) {
-      console.log(`[LOOP] NAV drifted ${(drift * 100).toFixed(1)}% since proposal — withdrawing #${pendingId}`);
+    if (drift > 0.1) {
+      console.log(
+        `[LOOP] NAV drifted ${(drift * 100).toFixed(1)}% since proposal — withdrawing #${pendingId}`,
+      );
       const tx = await policy.withdraw(pendingId);
       await tx.wait();
       console.log(`[LOOP] Withdrawn proposal #${pendingId}`);
@@ -55,7 +65,10 @@ async function checkPendingAndWithdraw(snapshot: VaultSnapshot): Promise<number>
 
     return pendingId;
   } catch (err) {
-    console.warn("[LOOP] Failed to check pending proposal:", (err as Error).message);
+    console.warn(
+      "[LOOP] Failed to check pending proposal:",
+      (err as Error).message,
+    );
     return 0;
   }
 }
@@ -75,11 +88,17 @@ function logCycleSummary(
   console.log("\n╔══════════════════════════════════════════╗");
   console.log(`║   Cycle #${cycle} Summary`);
   console.log("╠══════════════════════════════════════════╣");
-  console.log(`║  NAV:       $${navBefore.toLocaleString()} → $${navAfter.toLocaleString()}`);
-  console.log(`║  Quorum:    ${approvedActions} approved, ${rejectedActions} rejected (${thinkDuration}ms)`);
+  console.log(
+    `║  NAV:       $${navBefore.toLocaleString()} → $${navAfter.toLocaleString()}`,
+  );
+  console.log(
+    `║  Quorum:    ${approvedActions} approved, ${rejectedActions} rejected (${thinkDuration}ms)`,
+  );
   console.log(`║  Executed:  ${executedCount} proposals submitted`);
   console.log(`║  Attested:  ${attestCount} on-chain attestations`);
-  console.log(`║  Pending:   ${pendingId > 0 ? `proposal #${pendingId} awaiting manager` : "none"}`);
+  console.log(
+    `║  Pending:   ${pendingId > 0 ? `proposal #${pendingId} awaiting manager` : "none"}`,
+  );
   console.log(`║  Duration:  ${(cycleDuration / 1000).toFixed(1)}s`);
   console.log("╚══════════════════════════════════════════╝\n");
 }
@@ -97,6 +116,7 @@ async function runCycle(): Promise<void> {
   let approvedActions = 0;
   let rejectedActions = 0;
   let executedCount = 0;
+  let executionSucceeded = false;
   let pendingId = 0;
   let attestCount = 0;
 
@@ -122,9 +142,13 @@ async function runCycle(): Promise<void> {
   try {
     thinkResult = await think(snapshot, strategy, llm);
     thinkDuration = thinkResult.durationMs;
-    const allActions = [...thinkResult.quorum.rebalance, ...thinkResult.quorum.certify, ...thinkResult.quorum.issue];
-    approvedActions = allActions.filter(a => a.approved).length;
-    rejectedActions = allActions.filter(a => !a.approved).length;
+    const allActions = [
+      ...thinkResult.quorum.rebalance,
+      ...thinkResult.quorum.certify,
+      ...thinkResult.quorum.issue,
+    ];
+    approvedActions = allActions.filter((a) => a.approved).length;
+    rejectedActions = allActions.filter((a) => !a.approved).length;
   } catch (err) {
     console.error("[LOOP] THINK failed:", (err as Error).message);
     return;
@@ -135,24 +159,38 @@ async function runCycle(): Promise<void> {
     const executeResult = await execute(thinkResult.quorum, snapshot);
     executedCount = executeResult.outcomes.length;
     pendingId = executeResult.pendingProposalId;
+
+    const autoExecuted = executeResult.outcomes.filter(
+      (o) => o.status === ProposalStatus.AUTO_EXECUTED,
+    ).length;
+    executionSucceeded = autoExecuted > 0;
+
+    if (!executionSucceeded) {
+      console.log(
+        "[LOOP] EXECUTE produced no successful execution — skipping ATTEST and ISSUE",
+      );
+    }
   } catch (err) {
     console.error("[LOOP] EXECUTE failed:", (err as Error).message);
+    executionSucceeded = false;
   }
 
-  // ── ATTEST ──
-  try {
-    const attestResults = await attest(thinkResult.quorum, snapshot);
-    attestCount = attestResults.length;
-  } catch (err) {
-    console.error("[LOOP] ATTEST failed:", (err as Error).message);
-  }
+  if (executionSucceeded) {
+    // ── ATTEST ──
+    try {
+      const attestResults = await attest(thinkResult.quorum, snapshot);
+      attestCount = attestResults.length;
+    } catch (err) {
+      console.error("[LOOP] ATTEST failed:", (err as Error).message);
+    }
 
-  // ── ISSUE ──
-  try {
-    const issueResult = await issue(thinkResult.quorum, snapshot);
-    console.log(`[LOOP] Issue: ${issueResult.actions.length} action(s)`);
-  } catch (err) {
-    console.error("[LOOP] ISSUE failed:", (err as Error).message);
+    // ── ISSUE ──
+    try {
+      const issueResult = await issue(thinkResult.quorum, snapshot);
+      console.log(`[LOOP] Issue: ${issueResult.actions.length} action(s)`);
+    } catch (err) {
+      console.error("[LOOP] ISSUE failed:", (err as Error).message);
+    }
   }
 
   // ── RE-OBSERVE for NAV after ──
@@ -164,9 +202,16 @@ async function runCycle(): Promise<void> {
   }
 
   logCycleSummary(
-    cycleNumber, navBefore, navAfter, thinkDuration,
-    approvedActions, rejectedActions, executedCount,
-    pendingId, attestCount, Date.now() - cycleStart,
+    cycleNumber,
+    navBefore,
+    navAfter,
+    thinkDuration,
+    approvedActions,
+    rejectedActions,
+    executedCount,
+    pendingId,
+    attestCount,
+    Date.now() - cycleStart,
   );
 }
 
@@ -174,7 +219,9 @@ export async function startLoop(): Promise<void> {
   console.log("╔══════════════════════════════════════════╗");
   console.log("║   Sovereign Vault Protocol — AI Agent    ║");
   console.log("║   Autonomous Loop (US-2C.6)              ║");
-  console.log(`║   Interval: ${config.agent.loopIntervalMs / 1000}s                          ║`);
+  console.log(
+    `║   Interval: ${config.agent.loopIntervalMs / 1000}s                          ║`,
+  );
   console.log("╚══════════════════════════════════════════╝\n");
 
   setupGracefulShutdown();
@@ -184,12 +231,18 @@ export async function startLoop(): Promise<void> {
 
     if (!running) break;
 
-    console.log(`[LOOP] Waiting ${config.agent.loopIntervalMs / 1000}s before next cycle...`);
-    await new Promise<void>(resolve => {
+    console.log(
+      `[LOOP] Waiting ${config.agent.loopIntervalMs / 1000}s before next cycle...`,
+    );
+    await new Promise<void>((resolve) => {
       const timer = setTimeout(resolve, config.agent.loopIntervalMs);
       // Allow SIGINT/SIGTERM to break the wait
       const check = setInterval(() => {
-        if (!running) { clearTimeout(timer); clearInterval(check); resolve(); }
+        if (!running) {
+          clearTimeout(timer);
+          clearInterval(check);
+          resolve();
+        }
       }, 500);
     });
   }

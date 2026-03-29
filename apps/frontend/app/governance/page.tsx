@@ -52,7 +52,7 @@ export default function GovernancePage() {
             </div>
             <EmergencyPanel paused={data.settings.paused} onRefresh={refresh} />
           </div>
-          <SettingsPanel settings={data.settings} />
+          <SettingsPanel settings={data.settings} onRefresh={refresh} />
           <ProposalHistoryPanel history={data.history} />
         </div>
       )}
@@ -257,8 +257,68 @@ function EmergencyPanel({
 
 // ── Settings Panel ──────────────────────────────────────────────────────────
 
-function SettingsPanel({ settings }: { settings: GovernanceSettings }) {
+function SettingsPanel({
+  settings,
+  onRefresh,
+}: {
+  settings: GovernanceSettings;
+  onRefresh: () => void;
+}) {
+  const [showPermissionsModal, setShowPermissionsModal] = useState(false);
+  const [draftPermissions, setDraftPermissions] = useState<boolean[]>(
+    settings.categoryPermissions,
+  );
+  const [savingPermissions, setSavingPermissions] = useState(false);
   const windowMinutes = Math.round(settings.windowDuration / 60);
+
+  async function applyPermissionChanges() {
+    const changes = draftPermissions
+      .map((allowed, category) => ({
+        category,
+        allowed,
+        current: settings.categoryPermissions[category],
+      }))
+      .filter((entry) => entry.allowed !== entry.current);
+
+    if (changes.length === 0) {
+      setShowPermissionsModal(false);
+      return;
+    }
+
+    setSavingPermissions(true);
+    try {
+      for (const change of changes) {
+        const res = await fetch("/api/governance/category-permission", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            category: change.category,
+            allowed: change.allowed,
+          }),
+        });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          throw new Error(body.error ?? "Failed to update category permission");
+        }
+      }
+
+      setShowPermissionsModal(false);
+      onRefresh();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Action failed");
+    } finally {
+      setSavingPermissions(false);
+    }
+  }
+
+  function openPermissionsModal() {
+    setDraftPermissions([...settings.categoryPermissions]);
+    setShowPermissionsModal(true);
+  }
+
+  const changedCount = draftPermissions.filter(
+    (allowed, i) => allowed !== settings.categoryPermissions[i],
+  ).length;
 
   return (
     <div className="rounded-xl border border-border bg-surface p-5">
@@ -296,25 +356,97 @@ function SettingsPanel({ settings }: { settings: GovernanceSettings }) {
       </div>
 
       <div className="mt-5 border-t border-border pt-4">
-        <p className="mb-3 text-xs font-medium text-muted uppercase tracking-wide">
-          Category Permissions
-        </p>
-        <div className="flex flex-wrap gap-2">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <p className="text-xs font-medium text-muted uppercase tracking-wide">
+            Category Permissions
+          </p>
+          <button
+            onClick={openPermissionsModal}
+            className="rounded-md border border-border bg-surface-raised px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:bg-border"
+          >
+            Edit Permissions
+          </button>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {settings.categoryPermissions.map((allowed, i) => (
-            <span
+            <div
               key={i}
-              className={`rounded-full px-3 py-1 text-xs font-medium ${
+              className={`flex items-center justify-between rounded-lg border px-3 py-2 text-xs font-medium ${
                 allowed
-                  ? "bg-success/10 text-success"
-                  : "bg-danger/10 text-danger"
+                  ? "border-success/40 bg-success/10 text-success"
+                  : "border-danger/40 bg-danger/10 text-danger"
               }`}
             >
-              {CATEGORY_LABELS[i] ?? `Cat ${i}`}:{" "}
-              {allowed ? "AI-managed" : "Human-only"}
-            </span>
+              <span>{CATEGORY_LABELS[i] ?? `Cat ${i}`}</span>
+              <span>{allowed ? "ON" : "OFF"}</span>
+            </div>
           ))}
         </div>
       </div>
+
+      {showPermissionsModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Edit category permissions"
+        >
+          <div className="w-full max-w-md rounded-xl border border-border bg-surface p-5 shadow-xl">
+            <h4 className="text-sm font-semibold text-foreground">
+              Update Category Permissions
+            </h4>
+            <p className="mt-1 text-xs text-muted">
+              Toggle categories below, then confirm to submit all changes.
+            </p>
+
+            <div className="mt-4 space-y-2">
+              {draftPermissions.map((allowed, i) => (
+                <label
+                  key={i}
+                  className="flex items-center justify-between rounded-md border border-border bg-surface-raised px-3 py-2 text-sm"
+                >
+                  <span className="text-foreground">
+                    {CATEGORY_LABELS[i] ?? `Category ${i}`}
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={allowed}
+                    disabled={savingPermissions}
+                    onChange={(e) => {
+                      const next = [...draftPermissions];
+                      next[i] = e.target.checked;
+                      setDraftPermissions(next);
+                    }}
+                    className="h-4 w-4 accent-success disabled:opacity-50"
+                    aria-label={`Toggle ${CATEGORY_LABELS[i] ?? `category ${i}`} permission`}
+                  />
+                </label>
+              ))}
+            </div>
+
+            <div className="mt-2 text-xs text-muted">
+              {changedCount} change{changedCount !== 1 ? "s" : ""} pending
+            </div>
+
+            <div className="mt-5 flex justify-end gap-2">
+              <button
+                onClick={() => setShowPermissionsModal(false)}
+                disabled={savingPermissions}
+                className="rounded-md border border-border bg-surface-raised px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-border disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={applyPermissionChanges}
+                disabled={savingPermissions || changedCount === 0}
+                className="rounded-md bg-accent px-3 py-1.5 text-xs font-medium text-white transition-colors hover:bg-accent/80 disabled:opacity-50"
+              >
+                {savingPermissions ? "Submitting..." : "Confirm Changes"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
