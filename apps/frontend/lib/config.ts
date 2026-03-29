@@ -19,7 +19,21 @@ export const CONTRACTS = {
 } as const;
 
 /** Server-only: protocol owner key for signing governance + marketplace transactions */
-export const DEPLOYER_KEY = process.env.PROTOCOL_OWNER_PRIVATE_KEY ?? process.env.DEPLOYER_PRIVATE_KEY ?? "";
+export const DEPLOYER_KEY =
+  process.env.PROTOCOL_OWNER_PRIVATE_KEY ??
+  process.env.DEPLOYER_PRIVATE_KEY ??
+  "";
+
+/**
+ * Server-only: governance manager key used by VaultPolicy write actions.
+ * Fallback order intentionally prefers deployer key because VaultPolicy.manager
+ * is owned by deployer in current deployments.
+ */
+export const GOVERNANCE_MANAGER_KEY =
+  process.env.GOVERNANCE_MANAGER_PRIVATE_KEY ??
+  process.env.DEPLOYER_PRIVATE_KEY ??
+  process.env.PROTOCOL_OWNER_PRIVATE_KEY ??
+  "";
 
 export const BACKEND_API = "http://localhost:3001";
 

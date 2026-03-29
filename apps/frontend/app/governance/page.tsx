@@ -3,10 +3,7 @@
 import { useState } from "react";
 import { useGovernance } from "@/lib/use-governance";
 import { formatUSD } from "@/lib/format";
-import type {
-  Proposal,
-  GovernanceSettings,
-} from "@/lib/governance";
+import type { Proposal, GovernanceSettings } from "@/lib/governance";
 import { CATEGORY_LABELS, STATUS_LABELS } from "@/lib/governance";
 
 export default function GovernancePage() {
@@ -33,7 +30,10 @@ export default function GovernancePage() {
       </div>
 
       {error && !data && (
-        <div className="rounded-xl border border-danger/30 bg-danger/5 p-5 text-sm text-danger" role="alert">
+        <div
+          className="rounded-xl border border-danger/30 bg-danger/5 p-5 text-sm text-danger"
+          role="alert"
+        >
           {error}
         </div>
       )}
@@ -50,10 +50,7 @@ export default function GovernancePage() {
                 onRefresh={refresh}
               />
             </div>
-            <EmergencyPanel
-              paused={data.settings.paused}
-              onRefresh={refresh}
-            />
+            <EmergencyPanel paused={data.settings.paused} onRefresh={refresh} />
           </div>
           <SettingsPanel settings={data.settings} />
           <ProposalHistoryPanel history={data.history} />
@@ -91,6 +88,7 @@ function PendingProposalPanel({
       }
       onRefresh();
     } catch (err) {
+      console.error(`Failed to ${action} proposal:`, err);
       alert(err instanceof Error ? err.message : "Action failed");
     } finally {
       setActing(false);
@@ -132,7 +130,10 @@ function PendingProposalPanel({
         <h3 className="text-sm font-medium tracking-wide text-warning uppercase">
           Pending Proposal #{proposal.id}
         </h3>
-        <time className="text-xs text-muted tabular-nums" dateTime={date.toISOString()}>
+        <time
+          className="text-xs text-muted tabular-nums"
+          dateTime={date.toISOString()}
+        >
           {date.toLocaleString()}
         </time>
       </div>
@@ -141,7 +142,8 @@ function PendingProposalPanel({
         <div>
           <dt className="text-xs text-muted">Category</dt>
           <dd className="font-medium text-foreground">
-            {CATEGORY_LABELS[proposal.category] ?? `Category ${proposal.category}`}
+            {CATEGORY_LABELS[proposal.category] ??
+              `Category ${proposal.category}`}
           </dd>
         </div>
         <div>
@@ -280,11 +282,15 @@ function SettingsPanel({ settings }: { settings: GovernanceSettings }) {
         </div>
         <div>
           <p className="text-xs text-muted">Vault Status</p>
-          <p className={`mt-0.5 text-lg font-semibold ${settings.paused ? "text-danger" : "text-success"}`}>
+          <p
+            className={`mt-0.5 text-lg font-semibold ${settings.paused ? "text-danger" : "text-success"}`}
+          >
             {settings.paused ? "Paused" : "Active"}
           </p>
           <p className="text-xs text-muted">
-            {settings.paused ? "All operations halted" : "AI operating normally"}
+            {settings.paused
+              ? "All operations halted"
+              : "AI operating normally"}
           </p>
         </div>
       </div>
@@ -303,7 +309,8 @@ function SettingsPanel({ settings }: { settings: GovernanceSettings }) {
                   : "bg-danger/10 text-danger"
               }`}
             >
-              {CATEGORY_LABELS[i] ?? `Cat ${i}`}: {allowed ? "AI-managed" : "Human-only"}
+              {CATEGORY_LABELS[i] ?? `Cat ${i}`}:{" "}
+              {allowed ? "AI-managed" : "Human-only"}
             </span>
           ))}
         </div>
@@ -333,12 +340,24 @@ function ProposalHistoryPanel({ history }: { history: Proposal[] }) {
             <caption className="sr-only">Proposal history</caption>
             <thead>
               <tr className="border-t border-border text-left text-xs text-muted uppercase tracking-wide">
-                <th scope="col" className="px-5 py-3 font-medium">ID</th>
-                <th scope="col" className="px-5 py-3 font-medium">Date</th>
-                <th scope="col" className="px-5 py-3 font-medium">Category</th>
-                <th scope="col" className="px-5 py-3 font-medium text-right">Value</th>
-                <th scope="col" className="px-5 py-3 font-medium">Quorum</th>
-                <th scope="col" className="px-5 py-3 font-medium">Status</th>
+                <th scope="col" className="px-5 py-3 font-medium">
+                  ID
+                </th>
+                <th scope="col" className="px-5 py-3 font-medium">
+                  Date
+                </th>
+                <th scope="col" className="px-5 py-3 font-medium">
+                  Category
+                </th>
+                <th scope="col" className="px-5 py-3 font-medium text-right">
+                  Value
+                </th>
+                <th scope="col" className="px-5 py-3 font-medium">
+                  Quorum
+                </th>
+                <th scope="col" className="px-5 py-3 font-medium">
+                  Status
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -350,11 +369,16 @@ function ProposalHistoryPanel({ history }: { history: Proposal[] }) {
                     key={p.id}
                     className="border-t border-border/50 hover:bg-surface-raised/30 transition-colors"
                   >
-                    <td className="px-5 py-3 text-muted tabular-nums">#{p.id}</td>
+                    <td className="px-5 py-3 text-muted tabular-nums">
+                      #{p.id}
+                    </td>
                     <td className="px-5 py-3 text-muted tabular-nums whitespace-nowrap">
                       <time dateTime={date.toISOString()}>
                         {date.toLocaleDateString()}{" "}
-                        {date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                        {date.toLocaleTimeString([], {
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
                       </time>
                     </td>
                     <td className="px-5 py-3 text-foreground">
@@ -367,7 +391,9 @@ function ProposalHistoryPanel({ history }: { history: Proposal[] }) {
                       {p.quorumVotes}/4
                     </td>
                     <td className="px-5 py-3">
-                      <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColor}`}>
+                      <span
+                        className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${statusColor}`}
+                      >
                         {STATUS_LABELS[p.status] ?? "Unknown"}
                       </span>
                     </td>
@@ -384,11 +410,16 @@ function ProposalHistoryPanel({ history }: { history: Proposal[] }) {
 
 function statusColorMap(status: number): string {
   switch (status) {
-    case 1: return "bg-accent/10 text-accent";
-    case 2: return "bg-success/10 text-success";
-    case 3: return "bg-danger/10 text-danger";
-    case 4: return "bg-muted/10 text-muted";
-    default: return "bg-warning/10 text-warning";
+    case 1:
+      return "bg-accent/10 text-accent";
+    case 2:
+      return "bg-success/10 text-success";
+    case 3:
+      return "bg-danger/10 text-danger";
+    case 4:
+      return "bg-muted/10 text-muted";
+    default:
+      return "bg-warning/10 text-warning";
   }
 }
 

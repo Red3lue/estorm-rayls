@@ -1,5 +1,5 @@
 import { ethers } from "ethers";
-import { PRIVACY_NODE_RPC, CONTRACTS, DEPLOYER_KEY } from "./config";
+import { PRIVACY_NODE_RPC, CONTRACTS, GOVERNANCE_MANAGER_KEY } from "./config";
 import { VAULT_POLICY_ABI } from "./abis";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -70,9 +70,28 @@ function getReadContract(): ethers.Contract {
   );
 }
 
-function getWriteContract(): ethers.Contract {
-  const wallet = new ethers.Wallet(DEPLOYER_KEY, getProvider());
-  return new ethers.Contract(CONTRACTS.vaultPolicy, VAULT_POLICY_ABI, wallet);
+async function getWriteContract(): Promise<ethers.Contract> {
+  const wallet = new ethers.Wallet(GOVERNANCE_MANAGER_KEY, getProvider());
+  const contract = new ethers.Contract(
+    CONTRACTS.vaultPolicy,
+    VAULT_POLICY_ABI,
+    wallet,
+  );
+
+  // Fail fast with a clear message instead of an opaque on-chain revert.
+  const [signerAddress, managerAddress] = await Promise.all([
+    wallet.getAddress(),
+    contract.manager(),
+  ]);
+
+  if (signerAddress.toLowerCase() !== managerAddress.toLowerCase()) {
+    throw new Error(
+      `Configured signer ${signerAddress} is not VaultPolicy manager ${managerAddress}. ` +
+        "Set GOVERNANCE_MANAGER_PRIVATE_KEY (or DEPLOYER_PRIVATE_KEY) to the manager key.",
+    );
+  }
+
+  return contract;
 }
 
 function mapProposal(raw: {
@@ -150,9 +169,7 @@ export async function fetchGovernanceSnapshot(): Promise<GovernanceSnapshot> {
 
   const history: Proposal[] = historyRaw
     .map(mapProposal)
-    .sort(
-      (a: Proposal, b: Proposal) => b.createdAt - a.createdAt,
-    );
+    .sort((a: Proposal, b: Proposal) => b.createdAt - a.createdAt);
 
   return { pending, settings, history, timestamp: Date.now() };
 }
@@ -162,7 +179,10 @@ export async function fetchGovernanceSnapshot(): Promise<GovernanceSnapshot> {
 export async function approveProposal(
   proposalId: number,
 ): Promise<{ txHash: string }> {
-  const contract = getWriteContract();
+  if (!Number.isInteger(proposalId) || proposalId <= 0) {
+    throw new Error("Invalid proposalId; expected a positive integer");
+  }
+  const contract = await getWriteContract();
   const tx = await contract.approve(proposalId, { gasLimit: 500_000 });
   const receipt = await tx.wait();
   return { txHash: receipt.hash };
@@ -171,21 +191,24 @@ export async function approveProposal(
 export async function dismissProposal(
   proposalId: number,
 ): Promise<{ txHash: string }> {
-  const contract = getWriteContract();
+  if (!Number.isInteger(proposalId) || proposalId <= 0) {
+    throw new Error("Invalid proposalId; expected a positive integer");
+  }
+  const contract = await getWriteContract();
   const tx = await contract.dismiss(proposalId, { gasLimit: 500_000 });
   const receipt = await tx.wait();
   return { txHash: receipt.hash };
 }
 
 export async function emergencyStop(): Promise<{ txHash: string }> {
-  const contract = getWriteContract();
+  const contract = await getWriteContract();
   const tx = await contract.emergencyStop({ gasLimit: 200_000 });
   const receipt = await tx.wait();
   return { txHash: receipt.hash };
 }
 
 export async function resumeOperations(): Promise<{ txHash: string }> {
-  const contract = getWriteContract();
+  const contract = await getWriteContract();
   const tx = await contract.resume({ gasLimit: 200_000 });
   const receipt = await tx.wait();
   return { txHash: receipt.hash };

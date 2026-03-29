@@ -46,6 +46,7 @@ export const RECEIPT_TOKEN_ABI = [
 ] as const;
 
 export const VAULT_POLICY_ABI = [
+  "function manager() view returns (address)",
   "function approve(uint256 proposalId) external",
   "function dismiss(uint256 proposalId) external",
   "function emergencyStop() external",

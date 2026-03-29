@@ -3,7 +3,14 @@ import { dismissProposal } from "@/lib/governance";
 
 export async function POST(request: Request) {
   try {
-    const { proposalId } = (await request.json()) as { proposalId: number };
+    const payload = (await request.json()) as { proposalId?: unknown };
+    const proposalId = Number(payload.proposalId);
+    if (!Number.isInteger(proposalId) || proposalId <= 0) {
+      return NextResponse.json(
+        { error: "Invalid proposalId; expected a positive integer" },
+        { status: 400 },
+      );
+    }
     const result = await dismissProposal(proposalId);
     return NextResponse.json(result);
   } catch (error) {
