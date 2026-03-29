@@ -4,6 +4,7 @@ import { observe } from "./modules/observe/index.js";
 import { think, DefaultStrategy } from "./modules/think/index.js";
 import { execute } from "./modules/execute/index.js";
 import { attest } from "./modules/attest/index.js";
+import { issue } from "./modules/issue/index.js";
 import { ClaudeCodeAdapter } from "./adapters/claudeCode.js";
 import { getAgentWallet } from "./clients/privacyNode.js";
 import { VAULT_POLICY_ABI } from "./abis/index.js";
@@ -144,6 +145,14 @@ async function runCycle(): Promise<void> {
     attestCount = attestResults.length;
   } catch (err) {
     console.error("[LOOP] ATTEST failed:", (err as Error).message);
+  }
+
+  // ── ISSUE ──
+  try {
+    const issueResult = await issue(thinkResult.quorum, snapshot);
+    console.log(`[LOOP] Issue: ${issueResult.actions.length} action(s)`);
+  } catch (err) {
+    console.error("[LOOP] ISSUE failed:", (err as Error).message);
   }
 
   // ── RE-OBSERVE for NAV after ──
