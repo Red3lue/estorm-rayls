@@ -3,7 +3,14 @@ import { think, DefaultStrategy } from "./modules/think/index.js";
 import { execute } from "./modules/execute/index.js";
 import { attest } from "./modules/attest/index.js";
 import { ClaudeCodeAdapter } from "./adapters/claudeCode.js";
+import { startServer } from "./api/server.js";
 
+// ─── API Server ───────────────────────────────────────────────────────────────
+// Starts the Express API so the attestation contract can be deployed and
+// written to via HTTP, independently of the agent loop.
+startServer(Number(process.env.API_PORT ?? 3001));
+
+// ─── Agent Loop ───────────────────────────────────────────────────────────────
 async function main() {
   console.log("╔══════════════════════════════════════════╗");
   console.log("║   Sovereign Vault Protocol — AI Agent    ║");

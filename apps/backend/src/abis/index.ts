@@ -14,12 +14,15 @@ export const ERC721_ABI = [
   "function balanceOf(address) view returns (uint256)",
 ] as const;
 
-/** Demo Attestation.sol on Public Chain (US-2B.1 extended schema) */
+/** Attestation.sol on Public Chain (US-2B.1) — struct-based, deployer = immutable owner = agent */
 export const ATTESTATION_ABI = [
-  "function attest(address token, bool approved, string reason, uint256 score, uint8 decisionType, uint8 decisionOrigin, uint8 quorumVotes, uint8 quorumTotal, uint256 nav, uint256 riskScore, string portfolioBreakdown, string yieldHistory) external",
+  "function attest((address attester, address token, bool approved, string reason, uint256 score, uint256 timestamp, uint8 decisionType, uint8 decisionOrigin, uint8 quorumVotes, uint8 quorumTotal, uint256 nav, uint256 riskScore, string portfolioBreakdown, string yieldHistory) data) external",
   "function getAttestations(address token) view returns (tuple(address attester, address token, bool approved, string reason, uint256 score, uint256 timestamp, uint8 decisionType, uint8 decisionOrigin, uint8 quorumVotes, uint8 quorumTotal, uint256 nav, uint256 riskScore, string portfolioBreakdown, string yieldHistory)[])",
-  "function getAttestationCount(address token) view returns (uint256)",
-  "event Attested(address indexed token, address indexed attester, bool approved, uint256 score, uint8 decisionType)",
+  "function getLatestAttestation(address token) view returns (tuple(address attester, address token, bool approved, string reason, uint256 score, uint256 timestamp, uint8 decisionType, uint8 decisionOrigin, uint8 quorumVotes, uint8 quorumTotal, uint256 nav, uint256 riskScore, string portfolioBreakdown, string yieldHistory))",
+  "function getAttestationCount() view returns (uint256)",
+  "function getAttestationCountForToken(address token) view returns (uint256)",
+  "function owner() view returns (address)",
+  "event AttestationRecorded(address indexed token, address indexed attester, bool approved, uint8 decisionType, uint8 decisionOrigin, uint8 quorumVotes, uint256 nav, uint256 timestamp)",
 ] as const;
 
 /**
