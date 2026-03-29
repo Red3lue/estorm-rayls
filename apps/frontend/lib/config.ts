@@ -35,6 +35,13 @@ export const GOVERNANCE_MANAGER_KEY =
   process.env.PROTOCOL_OWNER_PRIVATE_KEY ??
   "";
 
+/** Server-only: attestation owner key used to write Attestation.sol records on Public Chain. */
+export const ATTESTATION_WRITER_KEY =
+  process.env.ATTESTATION_WRITER_KEY ??
+  process.env.PROTOCOL_OWNER_PRIVATE_KEY ??
+  process.env.DEPLOYER_PRIVATE_KEY ??
+  "";
+
 export const BACKEND_API = "http://localhost:3001";
 
 export const POLL_INTERVAL_MS = 15_000;
