@@ -1,4 +1,5 @@
 import { ethers } from "ethers";
+import { config } from "../../config/index.js";
 import type { VaultSnapshot } from "../../types/vault.js";
 import type { QuorumAction, RebalanceAction, CertifyDecision, IssueDecision } from "../../types/think.js";
 import { AssetCategory } from "../../types/execute.js";
@@ -34,6 +35,26 @@ function symbolToCategory(symbol: string): AssetCategory {
   return AssetCategory.BOND;
 }
 
+/**
+ * Convert a USD amount to raw token units using snapshot data.
+ * AI returns amounts in USD; we need raw units (balance * 10^decimals).
+ */
+function usdToTokenAmount(usdAmount: number, symbol: string, snapshot: VaultSnapshot): bigint {
+  const asset = snapshot.fungibles.find(f => f.symbol === symbol);
+  if (!asset || asset.value === 0) {
+    // Fallback: assume $1/token, 18 decimals
+    return ethers.parseUnits(usdAmount.toString(), 18);
+  }
+  // tokenAmount = usdAmount / pricePerToken * 10^decimals
+  // pricePerToken = asset.value / (balance / 10^decimals)
+  // Simpler: ratio = usdAmount / asset.value → tokenAmount = ratio * balance
+  const ratio = usdAmount / asset.value;
+  const rawBalance = asset.balance;
+  // Cap at 90% of available balance to avoid over-selling
+  const capped = Math.min(ratio, 0.9);
+  return BigInt(Math.floor(Number(rawBalance) * capped));
+}
+
 export function encodeRebalance(
   qa: QuorumAction<RebalanceAction>,
   snapshot: VaultSnapshot,
@@ -42,10 +63,12 @@ export function encodeRebalance(
   const a = qa.action;
   const fromAddr = resolveAddress(a.fromAsset, snapshot);
   const toAddr = resolveAddress(a.toAsset, snapshot);
-  const amountRaw = ethers.parseUnits(a.amount.toString(), 18);
+  const amountIn = usdToTokenAmount(a.amount, a.fromAsset, snapshot);
+  const amountOut = usdToTokenAmount(a.amount, a.toAsset, snapshot);
 
+  const dexAddr = config.contracts.mockDex || ethers.ZeroAddress;
   const callData = VAULT_LEDGER_IFACE.encodeFunctionData("swap", [
-    fromAddr, amountRaw, toAddr, amountRaw, ethers.ZeroAddress,
+    fromAddr, amountIn, toAddr, amountOut, dexAddr,
   ]);
 
   return {
