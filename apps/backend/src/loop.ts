@@ -28,9 +28,7 @@ function setupGracefulShutdown(): void {
   process.on("SIGTERM", () => shutdown("SIGTERM"));
 }
 
-async function checkPendingAndWithdraw(
-  snapshot: VaultSnapshot,
-): Promise<number> {
+async function checkPendingProposal(): Promise<number> {
   if (!config.contracts.vaultPolicy) return 0;
 
   try {
@@ -44,25 +42,7 @@ async function checkPendingAndWithdraw(
 
     if (pendingId === 0) return 0;
 
-    console.log(`[LOOP] Pending proposal #${pendingId} detected`);
-
-    // Check if the pending proposal is still valid by reading its details
-    const pending = await policy.getPendingProposal();
-    const navAtProposal = Number(pending.valueUSD);
-    const currentNav = Math.round(snapshot.nav * 100); // cents
-
-    // If NAV drifted significantly since the proposal, it may be invalidated
-    const drift = Math.abs(currentNav - navAtProposal) / (navAtProposal || 1);
-    if (drift > 0.1) {
-      console.log(
-        `[LOOP] NAV drifted ${(drift * 100).toFixed(1)}% since proposal — withdrawing #${pendingId}`,
-      );
-      const tx = await policy.withdraw(pendingId);
-      await tx.wait();
-      console.log(`[LOOP] Withdrawn proposal #${pendingId}`);
-      return 0;
-    }
-
+    console.log(`[LOOP] Pending proposal #${pendingId} detected — awaiting manager decision`);
     return pendingId;
   } catch (err) {
     console.warn(
@@ -132,7 +112,7 @@ async function runCycle(): Promise<void> {
 
   // ── PENDING CHECK ──
   try {
-    pendingId = await checkPendingAndWithdraw(snapshot);
+    pendingId = await checkPendingProposal();
   } catch (err) {
     console.error("[LOOP] PENDING CHECK failed:", (err as Error).message);
   }
@@ -155,6 +135,8 @@ async function runCycle(): Promise<void> {
   }
 
   // ── EXECUTE ──
+  // Quorum now returns at most 1 approved action, so if the single proposal
+  // reverts on-chain, executionSucceeded stays false → ATTEST + ISSUE are skipped.
   try {
     const executeResult = await execute(thinkResult.quorum, snapshot);
     executedCount = executeResult.outcomes.length;

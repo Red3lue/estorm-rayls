@@ -45,26 +45,26 @@ ${formatFungibles(snapshot.fungibles)}
 ${formatNonFungibles(snapshot.nonFungibles)}
 
 ## Your Task
-Analyze the vault and return a JSON object with exactly this structure. Return ONLY valid JSON, no markdown, no explanation outside the JSON:
+Analyze the vault and propose THE SINGLE MOST IMPORTANT ACTION to take right now.
+Pick exactly ONE action — either a rebalance swap, an NFT certification, or an issuance action.
+Return ONLY valid JSON, no markdown, no explanation outside the JSON:
 
 {
-  "rebalance": [
-    { "type": "swap|mint|burn", "fromAsset": "SYMBOL", "toAsset": "SYMBOL", "amount": <number in USD>, "reason": "..." }
-  ],
-  "certify": [
-    { "nftSymbol": "SYMBOL", "approved": true|false, "provenanceAssessment": "...", "qualityScore": 0-100, "riskRating": 0-100, "reason": "..." }
-  ],
-  "issue": [
-    { "action": "update_nav|mint_receipt|list|delist", "asset": "SYMBOL", "reason": "..." }
-  ],
+  "actionType": "rebalance" | "certify" | "issue" | "none",
+  "rebalance": { "type": "swap|mint|burn", "fromAsset": "SYMBOL", "toAsset": "SYMBOL", "amount": <number in USD>, "reason": "..." } | null,
+  "certify": { "nftSymbol": "SYMBOL", "approved": true|false, "provenanceAssessment": "...", "qualityScore": 0-100, "riskRating": 0-100, "reason": "..." } | null,
+  "issue": { "action": "update_nav|mint_receipt|list|delist", "asset": "SYMBOL", "reason": "..." } | null,
   "reasoning": "Overall analysis summary from your perspective"
 }
 
 Rules:
-- Only include rebalance actions if drift exceeds ${p.rebalanceTrigger * 100}% or risk/yield is out of bounds
-- Only certify NFTs that are currently UNCERTIFIED
-- Issue update_nav if NAV changed; mint_receipt only for newly certified NFTs
-- If no action is needed for a category, return an empty array []`;
+- You MUST propose exactly ONE action. Set the matching field and set the others to null.
+- Set actionType to "none" (all fields null) only if the portfolio is perfectly balanced.
+- STRONGLY PREFER rebalance swaps — the portfolio almost always has drift or risk/yield imbalance to correct. Propose a swap if ANY allocation drifts more than ${p.rebalanceTrigger * 100}% from ideal, or if risk/yield can be improved.
+- Keep swap amounts SMALL (under $40,000 USD) to stay within auto-execution limits.
+- Only propose certify or issue if there is truly nothing to rebalance.
+- Only certify NFTs that are currently UNCERTIFIED.
+- Issue update_nav if NAV changed; mint_receipt only for newly certified NFTs.`;
   }
 }
 

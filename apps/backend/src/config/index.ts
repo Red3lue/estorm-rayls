@@ -20,7 +20,10 @@ export const config = {
     chainId: Number(optional("PUBLIC_CHAIN_ID", "7295799")),
   },
   backendApi: {
-    url: optional("BACKEND_URL", "https://rayls-backend-privacy-node-1.rayls.com"),
+    url: optional(
+      "BACKEND_URL",
+      "https://rayls-backend-privacy-node-1.rayls.com",
+    ),
     userAuthKey: optional("USER_AUTH_KEY", ""),
     operatorAuthKey: optional("OPERATOR_AUTH_KEY", ""),
   },
@@ -30,7 +33,10 @@ export const config = {
     /** Protocol owner — hackathon: single key for agent, attestation writer, and Public Chain ops. */
     protocolOwner: optional("PROTOCOL_OWNER_PRIVATE_KEY", ""),
     /** Falls back to PROTOCOL_OWNER_PRIVATE_KEY for hackathon (same wallet for everything). */
-    attestationWriter: optional("ATTESTATION_WRITER_KEY", "") || optional("PROTOCOL_OWNER_PRIVATE_KEY", "") || optional("PUBLIC_DEPLOYER_KEY", ""),
+    attestationWriter:
+      optional("ATTESTATION_WRITER_KEY", "") ||
+      optional("PROTOCOL_OWNER_PRIVATE_KEY", "") ||
+      optional("PUBLIC_DEPLOYER_KEY", ""),
   },
   contracts: {
     bondGov: optional("BOND_GOV_ADDRESS", ""),
@@ -49,6 +55,9 @@ export const config = {
     marketplace: optional("MARKETPLACE_ADDRESS", ""),
   },
   agent: {
-    loopIntervalMs: Number(optional("LOOP_INTERVAL_MS", "30000")),
+    loopIntervalMs: Number(optional("LOOP_INTERVAL_MS", "3000")),
+    /** Quorum threshold: how many agents must agree (default 3 out of 4). Set to 1 for easy testing. */
+    quorumThreshold: Number(optional("QUORUM_THRESHOLD", "3")),
+    totalAgents: Number(optional("TOTAL_AGENTS", "4")),
   },
 } as const;
