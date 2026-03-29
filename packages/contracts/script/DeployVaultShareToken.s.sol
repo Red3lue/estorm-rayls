@@ -5,7 +5,7 @@ import {Script, console} from "forge-std/Script.sol";
 import {VaultShareToken} from "../src/VaultShareToken.sol";
 
 /// @notice Deploy VaultShareToken.sol to Public Chain (Chain ID 7295799).
-///         The deployer wallet (PUBLIC_DEPLOYER_KEY = AI agent) becomes the owner.
+///         The deployer wallet (PROTOCOL_OWNER_PRIVATE_KEY = AI agent) becomes the owner.
 ///
 ///         forge script script/DeployVaultShareToken.s.sol \
 ///           --rpc-url $PUBLIC_CHAIN_RPC_URL \
@@ -13,12 +13,12 @@ import {VaultShareToken} from "../src/VaultShareToken.sol";
 ///           --legacy
 ///
 ///         Required env vars:
-///           PUBLIC_DEPLOYER_KEY   — AI agent wallet (becomes owner)
+///           PROTOCOL_OWNER_PRIVATE_KEY   — AI agent wallet (becomes owner)
 ///
 ///         Output: VAULT_SHARE_TOKEN_ADDRESS (copy to .env)
 contract DeployVaultShareToken is Script {
     function run() external {
-        uint256 deployerKey  = vm.envUint("PUBLIC_DEPLOYER_KEY");
+        uint256 deployerKey  = vm.envUint("PROTOCOL_OWNER_PRIVATE_KEY");
         address deployerAddr = vm.addr(deployerKey);
 
         // NAV starts at 0 — grows as investors buy and agent deploys capital

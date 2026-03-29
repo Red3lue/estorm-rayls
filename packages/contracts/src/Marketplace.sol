@@ -185,6 +185,4 @@ contract Marketplace is Ownable {
         }
     }
 
-    // Accept USDr
-    receive() external payable {}
 }

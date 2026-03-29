@@ -5,7 +5,7 @@ import {Script, console} from "forge-std/Script.sol";
 import {Attestation} from "../src/Attestation.sol";
 
 /// @notice Deploy Attestation.sol to Public Chain (Chain ID 7295799).
-///         The deployer wallet (PUBLIC_DEPLOYER_KEY = AI agent) becomes the
+///         The deployer wallet (PROTOCOL_OWNER_PRIVATE_KEY = AI agent) becomes the
 ///         immutable owner — the only address that can ever call attest().
 ///
 ///         forge script script/DeployAttestation.s.sol \
@@ -14,12 +14,12 @@ import {Attestation} from "../src/Attestation.sol";
 ///           --legacy
 ///
 ///         Required env vars:
-///           PUBLIC_DEPLOYER_KEY   — AI agent wallet (becomes immutable owner)
+///           PROTOCOL_OWNER_PRIVATE_KEY   — AI agent wallet (becomes immutable owner)
 ///
 ///         Output: ATTESTATION_ADDRESS (copy to .env for backend)
 contract DeployAttestation is Script {
     function run() external {
-        uint256 deployerKey  = vm.envUint("PUBLIC_DEPLOYER_KEY");
+        uint256 deployerKey  = vm.envUint("PROTOCOL_OWNER_PRIVATE_KEY");
         address deployerAddr = vm.addr(deployerKey);
 
         console.log("Deployer (agent): ", deployerAddr);

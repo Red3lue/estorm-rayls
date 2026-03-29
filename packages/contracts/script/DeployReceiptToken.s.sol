@@ -5,7 +5,7 @@ import {Script, console} from "forge-std/Script.sol";
 import {ReceiptToken} from "../src/ReceiptToken.sol";
 
 /// @notice Deploy ReceiptToken.sol (Picasso) to Public Chain (Chain ID 7295799).
-///         The deployer wallet (PUBLIC_DEPLOYER_KEY = AI agent) becomes the owner.
+///         The deployer wallet (PROTOCOL_OWNER_PRIVATE_KEY = AI agent) becomes the owner.
 ///
 ///         forge script script/DeployReceiptToken.s.sol \
 ///           --rpc-url $PUBLIC_CHAIN_RPC_URL \
@@ -13,13 +13,13 @@ import {ReceiptToken} from "../src/ReceiptToken.sol";
 ///           --legacy
 ///
 ///         Required env vars:
-///           PUBLIC_DEPLOYER_KEY   — AI agent wallet (becomes owner)
+///           PROTOCOL_OWNER_PRIVATE_KEY   — AI agent wallet (becomes owner)
 ///           ATTESTATION_ADDRESS   — deployed Attestation.sol on Public Chain
 ///
 ///         Output: RECEIPT_TOKEN_ADDRESS (copy to .env)
 contract DeployReceiptToken is Script {
     function run() external {
-        uint256 deployerKey  = vm.envUint("PUBLIC_DEPLOYER_KEY");
+        uint256 deployerKey  = vm.envUint("PROTOCOL_OWNER_PRIVATE_KEY");
         address deployerAddr = vm.addr(deployerKey);
         address attestation  = vm.envAddress("ATTESTATION_ADDRESS");
 

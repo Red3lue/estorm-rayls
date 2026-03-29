@@ -12,12 +12,12 @@ import {Marketplace} from "../src/Marketplace.sol";
 ///           --legacy
 ///
 ///         Required env vars:
-///           PUBLIC_DEPLOYER_KEY — AI agent wallet (becomes owner)
+///           PROTOCOL_OWNER_PRIVATE_KEY — AI agent wallet (becomes owner)
 ///
 ///         Output: MARKETPLACE_ADDRESS (copy to .env)
 contract DeployMarketplace is Script {
     function run() external {
-        uint256 deployerKey  = vm.envUint("PUBLIC_DEPLOYER_KEY");
+        uint256 deployerKey  = vm.envUint("PROTOCOL_OWNER_PRIVATE_KEY");
         address deployerAddr = vm.addr(deployerKey);
 
         console.log("Deployer (agent): ", deployerAddr);
