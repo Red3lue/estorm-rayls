@@ -6,6 +6,7 @@ import { fileURLToPath } from "url";
 import { getAttestationWriterWallet } from "../clients/publicChain.js";
 import { config } from "../config/index.js";
 import { injectShock } from "../modules/shock/index.js";
+import { injectOpportunity } from "../modules/opportunity/index.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -169,6 +170,41 @@ export function createServer() {
   });
 
   /**
+   * POST /api/opportunity
+   *
+   * Introduces a new asset to the vault by registering it on VaultLedger.
+   * The agent's next OBSERVE cycle will detect and evaluate it.
+   *
+   * ERC-20 body: { type: "erc20", tokenAddress: "0x...", symbol: "BOND-HY-3M", riskScore: 45, yieldBps: 900, reason: "New high-yield bond" }
+   * ERC-721 body: { type: "erc721", tokenAddress: "0x...", symbol: "ART-MONET-01", riskScore: 35, tokenId: 1, valuationUSD: 30000000, reason: "New painting" }
+   */
+  app.post("/api/opportunity", async (req: Request, res: Response) => {
+    const { type, tokenAddress, symbol, riskScore, yieldBps, tokenId, valuationUSD, reason } = req.body as {
+      type: "erc20" | "erc721";
+      tokenAddress: string;
+      symbol: string;
+      riskScore: number;
+      yieldBps?: number;
+      tokenId?: number;
+      valuationUSD?: number;
+      reason: string;
+    };
+
+    if (!type || !tokenAddress || !symbol || riskScore == null || !reason) {
+      res.status(400).json({ error: "type, tokenAddress, symbol, riskScore, and reason are required" });
+      return;
+    }
+
+    try {
+      const result = await injectOpportunity({ type, tokenAddress, symbol, riskScore, yieldBps, tokenId, valuationUSD, reason });
+      res.json(result);
+    } catch (err) {
+      console.error("[API] Opportunity injection failed:", (err as Error).message);
+      res.status(500).json({ error: (err as Error).message });
+    }
+  });
+
+  /**
    * GET /health
    */
   app.get("/health", (_req: Request, res: Response) => {
@@ -192,6 +228,7 @@ export function startServer(port = 3001): void {
     console.log(`[API]   POST /api/attestation/attest`);
     console.log(`[API]   GET  /api/attestation/:address/attestations/:token`);
     console.log(`[API]   POST /api/shock`);
+    console.log(`[API]   POST /api/opportunity`);
     console.log(`[API]   GET  /health`);
   });
 }

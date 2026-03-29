@@ -13,7 +13,8 @@
     "test:watch": "vitest",
     "agent": "tsx src/index.ts",
     "onboard": "tsx src/scripts/onboard.ts",
-    "shock": "tsx src/cli/shock.ts"
+    "shock": "tsx src/cli/shock.ts",
+    "opportunity": "tsx src/cli/opportunity.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.39.0",
