@@ -13,7 +13,7 @@ export const CONTRACTS = {
   vaultPolicy: "0x023820d5fb4ECe1fAdeD6f90Fd35CF86A6091277",
   // Public Chain (Chain 7295799)
   attestation: "0xc986c24aB18C208883623569f9e2F20179e21CBc",
-  vaultShareToken: "0x6176d2c02705095aa261b1275004ffb476bad14d",
+  vaultShareToken: "0x3dBD4199A09F29a8268398c9BbD7B69512AD80CC",
   receiptToken: "0x6bA9dd9A6019A8EFe380B509FeB15F61493Bc64F",
   marketplace: "0x0fE1670F6dcc18aDF1130C18c360E09dc28FB223",
 } as const;
