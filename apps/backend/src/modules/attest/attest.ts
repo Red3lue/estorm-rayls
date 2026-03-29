@@ -10,20 +10,25 @@ import { buildAttestationPayloads } from "./buildPayload.js";
 async function submitAttestation(
   contract: ethers.Contract,
   payload: AttestationPayload,
+  agentAddress: string,
 ): Promise<AttestResult> {
   const tx = await contract.attest(
-    payload.token,
-    payload.approved,
-    payload.reason,
-    payload.score,
-    payload.decisionType,
-    payload.decisionOrigin,
-    payload.quorumVotes,
-    payload.quorumTotal,
-    payload.nav,
-    payload.riskScore,
-    payload.portfolioBreakdown,
-    payload.yieldHistory,
+    {
+      attester:           agentAddress,
+      token:              payload.token,
+      approved:           payload.approved,
+      reason:             payload.reason,
+      score:              payload.score,
+      timestamp:          Math.floor(Date.now() / 1000),
+      decisionType:       payload.decisionType,
+      decisionOrigin:     payload.decisionOrigin,
+      quorumVotes:        payload.quorumVotes,
+      quorumTotal:        payload.quorumTotal,
+      nav:                payload.nav,
+      riskScore:          payload.riskScore,
+      portfolioBreakdown: payload.portfolioBreakdown,
+      yieldHistory:       payload.yieldHistory,
+    },
     { gasLimit: 2_000_000 },
   );
 
@@ -70,7 +75,7 @@ export async function attest(
   const results: AttestResult[] = [];
   for (const payload of payloads) {
     try {
-      const result = await submitAttestation(contract, payload);
+      const result = await submitAttestation(contract, payload, wallet.address);
       results.push(result);
     } catch (err) {
       console.error(`[ATTEST] Failed to attest ${payload.reason.slice(0, 60)}...:`, (err as Error).message);
