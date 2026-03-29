@@ -194,8 +194,8 @@ async function fetchShareInfo(): Promise<ShareInfo | null> {
       share.getSharePrice(),
     ]);
     return {
-      nav: Number(nav) / 100,           // cents → dollars
-      sharePrice: Number(price) / 100,   // cents → dollars
+      nav: Number(ethers.formatUnits(nav, 18)),           // 18-dec USDr → dollars
+      sharePrice: Number(ethers.formatUnits(price, 18)),   // 18-dec USDr → dollars
       riskScore: 0,
     };
   } catch {

@@ -128,7 +128,7 @@ async function fetchShareData(): Promise<{
       token.totalSupply(),
     ]);
     return {
-      sharePrice: Number(price) / 100,                     // cents → dollars
+      sharePrice: Number(ethers.formatUnits(price, 18)),     // 18-dec USDr → dollars
       totalShares: Number(ethers.formatUnits(supply, 18)),
     };
   } catch {

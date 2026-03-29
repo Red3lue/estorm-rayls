@@ -21,10 +21,10 @@ contract DeployVaultShareToken is Script {
         uint256 deployerKey  = vm.envUint("PROTOCOL_OWNER_PRIVATE_KEY");
         address deployerAddr = vm.addr(deployerKey);
 
-        // NAV starts at 0 — grows as investors buy and agent deploys capital
-        // Initial share price: $10.00 (18-decimal USDr)
-        uint256 initialNAV        = 0;
-        uint256 initialSharePrice = 10e18;
+        // NAV = $100M in 18-decimal USDr
+        // Initial share price: $5,000 per share → 20,000 shares = $100M
+        uint256 initialNAV        = 100_000_000e18;
+        uint256 initialSharePrice = 5_000e18;
 
         console.log("Deployer (agent): ", deployerAddr);
         console.log("Initial NAV:      ", initialNAV, "cents ($900,000)");

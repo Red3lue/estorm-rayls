@@ -13,15 +13,16 @@ async function updateNAV(snapshot: VaultSnapshot): Promise<IssueAction | null> {
     const wallet = getAttestationWriterWallet();
     const contract = new ethers.Contract(config.contracts.vaultShareToken, VAULT_SHARE_TOKEN_ABI, wallet);
 
-    const currentNAV = Number(await contract.getNAV());
-    const newNAV = Math.round(snapshot.nav * 100); // cents
+    const currentNAV = await contract.getNAV() as bigint;
+    // VaultShareToken uses 18-decimal USDr (1e18 = $1.00)
+    const newNAV = ethers.parseUnits(Math.round(snapshot.nav).toString(), 18);
 
     if (currentNAV === newNAV) {
       console.log("[ISSUE] NAV unchanged — skipping update");
       return null;
     }
 
-    console.log(`[ISSUE] Updating NAV: ${currentNAV} → ${newNAV} cents`);
+    console.log(`[ISSUE] Updating NAV: $${ethers.formatUnits(currentNAV, 18)} → $${ethers.formatUnits(newNAV, 18)}`);
     const tx = await contract.updateNAV(newNAV, { gasLimit: 500_000 });
     await tx.wait();
     console.log(`[ISSUE] NAV updated — tx: ${tx.hash}`);
