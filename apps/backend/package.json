@@ -12,6 +12,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "agent": "tsx src/index.ts",
+    "onboard": "tsx src/scripts/onboard.ts",
     "shock": "tsx src/cli/shock.ts"
   },
   "dependencies": {

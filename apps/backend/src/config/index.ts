@@ -19,6 +19,11 @@ export const config = {
     rpcUrl: optional("PUBLIC_CHAIN_RPC_URL", "https://testnet-rpc.rayls.com/"),
     chainId: Number(optional("PUBLIC_CHAIN_ID", "7295799")),
   },
+  backendApi: {
+    url: optional("BACKEND_URL", "https://rayls-backend-privacy-node-1.rayls.com"),
+    userAuthKey: optional("USER_AUTH_KEY", ""),
+    operatorAuthKey: optional("OPERATOR_AUTH_KEY", ""),
+  },
   keys: {
     deployer: required("DEPLOYER_PRIVATE_KEY"),
     registered: optional("REGISTERED_PRIVATE_KEY", ""),
