@@ -14,9 +14,15 @@ export function getPrivacyNodeProvider(): ethers.JsonRpcProvider {
   return provider;
 }
 
+/**
+ * Returns the agent wallet for Privacy Node operations.
+ * Hackathon: uses PROTOCOL_OWNER_PRIVATE_KEY if set (same key as VaultPolicy agent),
+ * falls back to DEPLOYER_PRIVATE_KEY.
+ */
 export function getAgentWallet(): ethers.Wallet {
   if (!wallet) {
-    wallet = new ethers.Wallet(config.keys.deployer, getPrivacyNodeProvider());
+    const key = config.keys.protocolOwner || config.keys.deployer;
+    wallet = new ethers.Wallet(key, getPrivacyNodeProvider());
   }
   return wallet;
 }
