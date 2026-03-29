@@ -1,65 +1,87 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
+import { useVaultSnapshot } from "@/lib/use-vault-snapshot";
+import { NavDisplay } from "@/components/nav-display";
+import { AllocationChart } from "@/components/allocation-chart";
+import { FungibleTable } from "@/components/fungible-table";
+import { NftInventory } from "@/components/nft-inventory";
+
+export default function ManagerDashboard() {
+  const { snapshot, loading, error, refresh } = useVaultSnapshot();
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+    <div className="flex min-h-full flex-col">
+      <header className="border-b border-border bg-surface px-6 py-4">
+        <div className="mx-auto flex max-w-6xl items-center justify-between">
+          <div>
+            <h1 className="text-lg font-semibold tracking-tight text-foreground">
+              Sovereign Vault Protocol
+            </h1>
+            <p className="text-xs text-muted">Vault Manager Dashboard</p>
+          </div>
+          <div className="flex items-center gap-3">
+            {snapshot && (
+              <span className="text-xs text-muted tabular-nums">
+                Updated{" "}
+                {new Date(snapshot.timestamp).toLocaleTimeString()}
+              </span>
+            )}
+            <button
+              onClick={refresh}
+              disabled={loading}
+              className="rounded-lg border border-border bg-surface-raised px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:bg-border disabled:opacity-50"
+              aria-label="Refresh vault data"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+              {loading ? "Loading..." : "Refresh"}
+            </button>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+      </header>
+
+      <main className="mx-auto w-full max-w-6xl flex-1 px-6 py-6">
+        {error && !snapshot && (
+          <div
+            className="rounded-xl border border-danger/30 bg-danger/5 p-5 text-sm text-danger"
+            role="alert"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
+            <p className="font-medium">Failed to load vault data</p>
+            <p className="mt-1 text-danger/80">{error}</p>
+          </div>
+        )}
+
+        {loading && !snapshot && <SkeletonDashboard />}
+
+        {snapshot && (
+          <div className="flex flex-col gap-6">
+            <NavDisplay snapshot={snapshot} />
+            <div className="grid gap-6 lg:grid-cols-2">
+              <AllocationChart fungibles={snapshot.fungibles} />
+              <NftInventory nonFungibles={snapshot.nonFungibles} />
+            </div>
+            <FungibleTable fungibles={snapshot.fungibles} />
+          </div>
+        )}
       </main>
+    </div>
+  );
+}
+
+function SkeletonDashboard() {
+  return (
+    <div className="flex flex-col gap-6 animate-pulse" aria-busy="true">
+      <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div
+            key={i}
+            className="h-24 rounded-xl border border-border bg-surface"
+          />
+        ))}
+      </div>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="h-64 rounded-xl border border-border bg-surface" />
+        <div className="h-64 rounded-xl border border-border bg-surface" />
+      </div>
+      <div className="h-48 rounded-xl border border-border bg-surface" />
     </div>
   );
 }
