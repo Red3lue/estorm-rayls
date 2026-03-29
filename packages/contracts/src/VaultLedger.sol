@@ -17,6 +17,24 @@ interface IPriceOracle {
     function getPrice(address token) external view returns (uint256); // cents per whole token
 }
 
+interface IDvPExchange {
+    struct Asset {
+        uint8   assetType;      // 0 = ERC20
+        address tokenAddress;
+        uint256 amount;
+        uint256 tokenId;        // ignored for ERC20
+    }
+
+    function createExchange(
+        address  creator,
+        Asset    calldata creatorAsset,
+        address  beneficiary,
+        address  counterparty,
+        Asset    calldata counterpartyAsset,
+        uint256  expiration
+    ) external returns (uint256 exchangeId);
+}
+
 /// @title VaultLedger
 /// @notice On-chain custodian and state store for the Sovereign Vault.
 ///
@@ -94,6 +112,7 @@ contract VaultLedger is Ownable {
     event PortfolioUpdated(uint256 navUSD, uint256 timestamp);
     event AssetAdded(address indexed tokenAddress, string symbol, uint256 balance, uint256 valueUSD);
     event AssetSwapped(address indexed tokenIn, uint256 amountIn, address indexed tokenOut, uint256 amountOut);
+    event DvPExchangeCreated(uint256 indexed exchangeId, address indexed tokenIn, uint256 amountIn, address indexed tokenOut, uint256 amountOut);
     event ERC721Updated(address indexed tokenAddress, uint256 indexed tokenId, uint256 valuationUSD, bool certified);
     event NFTAdded(address indexed tokenAddress, uint256 indexed tokenId, string symbol);
     event TradeRecorded(uint256 indexed index, TradeAction action, uint256 navAfter, bool humanApproved);
@@ -201,6 +220,46 @@ contract VaultLedger is Ownable {
         lastUpdated = block.timestamp;
 
         emit AssetSwapped(tokenIn, amountIn, tokenOut, amountOut);
+        emit PortfolioUpdated(lastNAV, lastUpdated);
+    }
+
+    /// @notice Create a DvP exchange — the Rayls-native atomic swap mechanism.
+    ///         Approves the DvP contract for `amountIn`, then calls `createExchange()`.
+    ///         The DvP escrows `tokenIn` until the counterparty settles or it expires.
+    ///
+    ///         After the counterparty calls `executeExchange()`, `tokenOut` arrives
+    ///         in this contract. Call `updatePortfolio()` to refresh balances.
+    function createDvPExchange(
+        address tokenIn,
+        uint256 amountIn,
+        address counterparty,
+        address tokenOut,
+        uint256 amountOut,
+        address dvpExchange,
+        uint256 expiration
+    ) external onlyOwner returns (uint256 exchangeId) {
+        require(erc20Assets[tokenIn].active,  "tokenIn not registered");
+        require(erc20Assets[tokenOut].active, "tokenOut not registered");
+        require(dvpExchange != address(0), "zero dvp");
+
+        IERC20(tokenIn).approve(dvpExchange, amountIn);
+
+        exchangeId = IDvPExchange(dvpExchange).createExchange(
+            address(this),
+            IDvPExchange.Asset({ assetType: 0, tokenAddress: tokenIn,  amount: amountIn,  tokenId: 0 }),
+            address(this), // beneficiary = this vault
+            counterparty,
+            IDvPExchange.Asset({ assetType: 0, tokenAddress: tokenOut, amount: amountOut, tokenId: 0 }),
+            expiration
+        );
+
+        // Refresh tokenIn balance (now in escrow)
+        _refreshAsset(tokenIn);
+        _recomputeAllocations();
+        lastNAV     = getNAV();
+        lastUpdated = block.timestamp;
+
+        emit DvPExchangeCreated(exchangeId, tokenIn, amountIn, tokenOut, amountOut);
         emit PortfolioUpdated(lastNAV, lastUpdated);
     }
 

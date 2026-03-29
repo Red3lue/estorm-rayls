@@ -13,6 +13,7 @@ export interface EncodedProposal {
 
 const VAULT_LEDGER_IFACE = new ethers.Interface([
   "function swap(address tokenIn, uint256 amountIn, address tokenOut, uint256 amountOut, address dex)",
+  "function createDvPExchange(address tokenIn, uint256 amountIn, address counterparty, address tokenOut, uint256 amountOut, address dvpExchange, uint256 expiration)",
   "function updatePortfolio(address[] tokens, uint8[] riskScores, uint256[] yieldBps)",
   "function updateERC721(address tokenAddress, uint256 tokenId, uint256 valuationUSD, bool certified, uint8 certScore, uint8 riskScore)",
 ]);
@@ -52,6 +53,37 @@ export function encodeRebalance(
     callData,
     category: symbolToCategory(a.fromAsset),
     reasoning: `REBALANCE [${qa.approvedBy.length}/${qa.approvedBy.length + qa.rejectedBy.length}]: ${a.type} ${a.fromAsset} → ${a.toAsset} ($${a.amount}). ${a.reason}`,
+    quorumVotes: qa.approvedBy.length,
+  };
+}
+
+/**
+ * Encodes a rebalance action as a DvP exchange (Rayls-native atomic swap).
+ * Used instead of encodeRebalance when a DvP counterparty is available.
+ */
+export function encodeDvPRebalance(
+  qa: QuorumAction<RebalanceAction>,
+  snapshot: VaultSnapshot,
+  vaultLedgerAddr: string,
+  dvpExchangeAddr: string,
+  counterparty: string,
+  expirationSec: number = 3600,
+): EncodedProposal {
+  const a = qa.action;
+  const fromAddr = resolveAddress(a.fromAsset, snapshot);
+  const toAddr = resolveAddress(a.toAsset, snapshot);
+  const amountRaw = ethers.parseUnits(a.amount.toString(), 18);
+  const expiration = Math.floor(Date.now() / 1000) + expirationSec;
+
+  const callData = VAULT_LEDGER_IFACE.encodeFunctionData("createDvPExchange", [
+    fromAddr, amountRaw, counterparty, toAddr, amountRaw, dvpExchangeAddr, expiration,
+  ]);
+
+  return {
+    target: vaultLedgerAddr,
+    callData,
+    category: symbolToCategory(a.fromAsset),
+    reasoning: `DvP REBALANCE [${qa.approvedBy.length}/${qa.approvedBy.length + qa.rejectedBy.length}]: ${a.type} ${a.fromAsset} → ${a.toAsset} ($${a.amount}). ${a.reason}`,
     quorumVotes: qa.approvedBy.length,
   };
 }

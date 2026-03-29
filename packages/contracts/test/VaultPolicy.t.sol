@@ -6,6 +6,7 @@ import {VaultPolicy} from "../src/VaultPolicy.sol";
 import {VaultLedger} from "../src/VaultLedger.sol";
 import {PriceOracle} from "../src/PriceOracle.sol";
 import {MockDEX} from "../src/MockDEX.sol";
+import {DvPExchange} from "../src/DvPExchange.sol";
 import {MockERC20} from "./mocks/Mocks.sol";
 
 // ─── Test ─────────────────────────────────────────────────────────────────────
@@ -586,5 +587,91 @@ contract VaultPolicyTest is Test {
         // Vault should now have 900 tokenA and 60,000 tokenB
         assertEq(tokenA.balanceOf(address(ledger)), TOKEN_A_BALANCE - 100e18);
         assertEq(tokenB.balanceOf(address(ledger)), TOKEN_B_BALANCE + 10_000e6);
+    }
+
+    // ── DvP Exchange via VaultPolicy ─────────────────────────────────────────
+
+    function test_createDvPExchange_executesViaPolicy() public {
+        DvPExchange dvp = new DvPExchange();
+
+        // Register assets in ledger
+        vm.prank(agent);
+        policy.propose(address(ledger), _addTokenAReal(), VaultPolicy.AssetCategory.BOND, "add A", 3);
+        vm.prank(agent);
+        policy.propose(address(ledger), _addTokenBReal(), VaultPolicy.AssetCategory.STABLECOIN, "add B", 2);
+
+        // Propose DvP exchange: sell 100 tokenA for 10,000 tokenB
+        bytes memory dvpCall = abi.encodeWithSignature(
+            "createDvPExchange(address,uint256,address,address,uint256,address,uint256)",
+            address(tokenA), uint256(100e18), makeAddr("counterparty"),
+            address(tokenB), uint256(10_000e6), address(dvp), block.timestamp + 1 hours
+        );
+        vm.prank(agent);
+        policy.propose(address(ledger), dvpCall, VaultPolicy.AssetCategory.BOND, "DvP rebalance", 3);
+
+        // Vault's bond tokens should now be in DvP escrow
+        assertEq(tokenA.balanceOf(address(ledger)), TOKEN_A_BALANCE - 100e18);
+        assertEq(tokenA.balanceOf(address(dvp)),    100e18);
+    }
+
+    function test_createDvPExchange_valueExtraction() public {
+        // Register assets
+        vm.prank(agent);
+        policy.propose(address(ledger), _addTokenAReal(), VaultPolicy.AssetCategory.BOND, "add A", 3);
+        vm.prank(agent);
+        policy.propose(address(ledger), _addTokenBReal(), VaultPolicy.AssetCategory.STABLECOIN, "add B", 2);
+
+        // extractValue for createDvPExchange should use oracle price of amountIn
+        bytes memory dvpCall = abi.encodeWithSignature(
+            "createDvPExchange(address,uint256,address,address,uint256,address,uint256)",
+            address(tokenA), uint256(100e18), makeAddr("counterparty"),
+            address(tokenB), uint256(10_000e6), address(0xDEAD), block.timestamp + 1 hours
+        );
+        uint256 val = policy.extractValue(dvpCall, address(ledger));
+        // 100 tokens * $100/token = $10,000 → 1_000_000 cents
+        assertEq(val, 100 * TOKEN_A_PRICE);
+    }
+
+    function test_dvpSelector_isWhitelisted() public view {
+        bytes4 sel = bytes4(keccak256("createDvPExchange(address,uint256,address,address,uint256,address,uint256)"));
+        assertTrue(policy.allowedSelectors(sel));
+    }
+
+    function test_createDvPExchange_thenCounterpartySettles() public {
+        DvPExchange dvp = new DvPExchange();
+        address cp = makeAddr("counterparty");
+
+        // Register assets
+        vm.prank(agent);
+        policy.propose(address(ledger), _addTokenAReal(), VaultPolicy.AssetCategory.BOND, "add A", 3);
+        vm.prank(agent);
+        policy.propose(address(ledger), _addTokenBReal(), VaultPolicy.AssetCategory.STABLECOIN, "add B", 2);
+
+        uint256 amountIn  = 100e18;
+        uint256 amountOut = 10_000e6;
+
+        // Propose DvP exchange
+        bytes memory dvpCall = abi.encodeWithSignature(
+            "createDvPExchange(address,uint256,address,address,uint256,address,uint256)",
+            address(tokenA), amountIn, cp,
+            address(tokenB), amountOut, address(dvp), block.timestamp + 1 hours
+        );
+        vm.prank(agent);
+        policy.propose(address(ledger), dvpCall, VaultPolicy.AssetCategory.BOND, "DvP rebalance", 3);
+
+        // Fund counterparty and approve DvP
+        tokenB.mint(cp, amountOut);
+        vm.prank(cp);
+        tokenB.approve(address(dvp), amountOut);
+
+        // Counterparty settles
+        uint256 stableBefore = tokenB.balanceOf(address(ledger));
+        vm.prank(cp);
+        dvp.executeExchange(0);
+
+        // Atomic settlement: vault gets stables, counterparty gets bonds
+        assertEq(tokenB.balanceOf(address(ledger)), stableBefore + amountOut);
+        assertEq(tokenA.balanceOf(cp), amountIn);
+        assertEq(tokenA.balanceOf(address(dvp)), 0); // escrow cleared
     }
 }

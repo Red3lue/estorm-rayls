@@ -37,6 +37,18 @@ export const VAULT_LEDGER_ABI = [
   "function getERC721Count() view returns (uint256)",
 ] as const;
 
+/** DvPExchange.sol — Rayls-native atomic swap on Privacy Node (US-2A.4) */
+export const DVP_EXCHANGE_ABI = [
+  "function createExchange(address creator, (uint8 assetType, address tokenAddress, uint256 amount, uint256 tokenId) creatorAsset, address beneficiary, address counterparty, (uint8 assetType, address tokenAddress, uint256 amount, uint256 tokenId) counterpartyAsset, uint256 expiration) external returns (uint256 exchangeId)",
+  "function executeExchange(uint256 exchangeId) external",
+  "function cancelExchange(uint256 exchangeId) external",
+  "function getExchange(uint256 exchangeId) view returns (tuple(address creator, tuple(uint8 assetType, address tokenAddress, uint256 amount, uint256 tokenId) creatorAsset, address creatorBeneficiary, address counterparty, tuple(uint8 assetType, address tokenAddress, uint256 amount, uint256 tokenId) counterpartyAsset, uint256 expirationDate, uint8 status))",
+  "function nextExchangeId() view returns (uint256)",
+  "event ExchangeCreated(uint256 indexed exchangeId, address indexed creator, address tokenIn, uint256 amountIn, address tokenOut, uint256 amountOut, address counterparty, uint256 expirationDate)",
+  "event ExchangeExecuted(uint256 indexed exchangeId, address indexed executor)",
+  "event ExchangeCancelled(uint256 indexed exchangeId)",
+] as const;
+
 /** VaultPolicy.sol — governance gateway on Privacy Node */
 export const VAULT_POLICY_ABI = [
   "function propose(address target, bytes callData, uint8 category, string reasoning, uint8 quorumVotes) external returns (uint256 id)",

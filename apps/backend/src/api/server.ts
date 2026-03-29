@@ -3,7 +3,7 @@ import { ethers } from "ethers";
 import { readFileSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
-import { getPublicChainWallet } from "../clients/publicChain.js";
+import { getAttestationWriterWallet } from "../clients/publicChain.js";
 import { config } from "../config/index.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -36,7 +36,7 @@ export function createServer() {
    */
   app.post("/api/attestation/deploy", async (_req: Request, res: Response) => {
     try {
-      const wallet = getPublicChainWallet();
+      const wallet = getAttestationWriterWallet();
       const { abi, bytecode } = loadArtifact();
 
       console.log(`[API] Deploying Attestation.sol — agent: ${wallet.address}`);
@@ -93,7 +93,7 @@ export function createServer() {
     }
 
     try {
-      const wallet = getPublicChainWallet();
+      const wallet = getAttestationWriterWallet();
       const { abi } = loadArtifact();
       const contract = new ethers.Contract(contractAddress, abi, wallet);
 
@@ -125,7 +125,7 @@ export function createServer() {
     async (req: Request, res: Response) => {
       const { contractAddress, token } = req.params;
       try {
-        const wallet = getPublicChainWallet();
+        const wallet = getAttestationWriterWallet();
         const { abi } = loadArtifact();
         const contract = new ethers.Contract(contractAddress as string, abi, wallet.provider);
 
@@ -144,7 +144,7 @@ export function createServer() {
     res.json({
       status: "ok",
       agentAddress: (() => {
-        try { return getPublicChainWallet().address; } catch { return null; }
+        try { return getAttestationWriterWallet().address; } catch { return null; }
       })(),
       attestationAddress: config.contracts.attestation || null,
     });
